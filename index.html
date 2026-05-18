@@ -856,25 +856,139 @@
   <!-- REPORT DASHBOARD VIEW (Hidden, Admin Only) -->
   <div id="view-report" class="hidden">
     <div class="report-dashboard-shell">
-      <div class="report-dashboard-header">
-        <div>
-          <h2>Report Dashboard</h2>
-          <p>Live Looker Studio dashboard connected to the Master Sheet.</p>
+      <div class="kpi-dashboard">
+        <header class="kpi-topbar">
+          <div>
+            <h2>HAPPY Program KPI Dashboard</h2>
+            <p>Track participant progress across all key stages</p>
+          </div>
+          <div class="kpi-topbar-actions">
+            <button type="button" class="kpi-topbar-pill">May 1 - May 7, 2026 <span aria-hidden="true">▣</span></button>
+            <button type="button" class="kpi-topbar-pill">Collector: Gideon <span aria-hidden="true">⌄</span></button>
+          </div>
+        </header>
+
+        <div class="kpi-body">
+          <aside class="kpi-filters" aria-label="Dashboard filters">
+            <h3><span aria-hidden="true">≡</span> Filters</h3>
+            <label><span>Region</span><select><option>All</option></select></label>
+            <label><span>District</span><select><option>All</option></select></label>
+            <label><span>Community</span><select><option>All</option></select></label>
+            <label><span>Gender</span><select><option>All</option></select></label>
+            <label><span>Current Stage</span><select><option>All</option></select></label>
+            <label><span>CV Status</span><select><option>All</option></select></label>
+            <label><span>Employment Status</span><select><option>All</option></select></label>
+            <p class="kpi-filter-note">All filters are interactive. Select values to update the dashboard.</p>
+          </aside>
+
+          <main class="kpi-content">
+            <section class="kpi-score-grid" aria-label="Core KPIs">
+              <article class="kpi-card"><div class="kpi-icon blue">●●●</div><span>Total Participants</span><strong id="dashTotalParticipants">12,458</strong></article>
+              <article class="kpi-card"><div class="kpi-icon green">✓</div><span>Consent Complete</span><strong id="dashConsentComplete">11,682</strong><em id="dashConsentPct" class="green">93.8%</em></article>
+              <article class="kpi-card"><div class="kpi-icon purple">▣</div><span>Registration Submitted</span><strong id="dashRegistrationSubmitted">10,234</strong><em id="dashRegistrationPct" class="purple">82.2%</em></article>
+              <article class="kpi-card"><div class="kpi-icon orange">▥</div><span>Capacity Submitted</span><strong id="dashCapacitySubmitted">7,856</strong><em id="dashCapacityPct" class="orange">63.1%</em></article>
+              <article class="kpi-card"><div class="kpi-icon teal">▣</div><span>Placement Submitted</span><strong id="dashPlacementSubmitted">4,321</strong><em id="dashPlacementPct" class="teal">34.7%</em></article>
+              <article class="kpi-card"><div class="kpi-icon rose">▤</div><span>CV Uploaded</span><strong id="dashCvUploaded">8,765</strong><em id="dashCvPct" class="rose">70.3%</em></article>
+            </section>
+
+            <section class="kpi-grid">
+              <article class="kpi-panel wide">
+                <h3>Participants by Gender</h3>
+                <div class="donut-row">
+                  <div class="pie gender-pie"><span>61.3%</span><small>38.7%</small></div>
+                  <div class="legend"><p><i class="blue-bg"></i><b>Male</b><span>7,632 (61.3%)</span></p><p><i class="red-bg"></i><b>Female</b><span>4,826 (38.7%)</span></p></div>
+                </div>
+                <footer>Total 12,458</footer>
+              </article>
+              <article class="kpi-panel wide">
+                <h3>Youth vs Non-Youth</h3>
+                <div class="donut-row">
+                  <div class="donut youth-donut"><span>71.4%</span><small>28.6%</small></div>
+                  <div class="legend"><p><i class="blue-bg"></i><b>Youth (18-35)</b><span>8,893 (71.4%)</span></p><p><i class="red-bg"></i><b>Non-Youth (36+)</b><span>3,565 (28.6%)</span></p></div>
+                </div>
+                <footer>Total 12,458</footer>
+              </article>
+              <article class="kpi-panel stat-panel"><h3>PWD Status</h3><div class="circle-stat purple">♿</div><strong>971</strong><span>(7.8%)</span><footer>Total 12,458</footer></article>
+              <article class="kpi-panel stat-panel"><h3>Refugee Status</h3><div class="circle-stat green">⚭</div><strong>646</strong><span>(5.2%)</span><footer>Total 12,458</footer></article>
+
+              <article class="kpi-panel">
+                <h3>Participants by Stage</h3>
+                <div class="vertical-chart stage-chart">
+                  <div style="--h:100%"><span>12,458</span><b>Registered</b></div>
+                  <div style="--h:82%"><span>10,234</span><b>Capacity<br>Submitted</b></div>
+                  <div style="--h:63%"><span>7,856</span><b>Training<br>Submitted</b></div>
+                  <div style="--h:35%"><span>4,321</span><b>Placement<br>Submitted</b></div>
+                </div>
+              </article>
+              <article class="kpi-panel">
+                <h3>CV Status</h3>
+                <div class="vertical-chart purple-chart">
+                  <div style="--h:100%"><span>8,765</span><b>Uploaded</b></div>
+                  <div style="--h:29%"><span>1,980</span><b>Pending</b></div>
+                  <div style="--h:24%"><span>1,713</span><b>Not Uploaded</b></div>
+                </div>
+              </article>
+              <article class="kpi-panel wide">
+                <h3>Participants by Region</h3>
+                <div class="hbar-list" id="dashRegionBars">
+                  <p style="--w:100%"><span>Greater Accra</span><b>2,345 (18.8%)</b></p>
+                  <p style="--w:86%"><span>Ashanti</span><b>2,102 (16.9%)</b></p>
+                  <p style="--w:77%"><span>Northern</span><b>1,876 (15.1%)</b></p>
+                  <p style="--w:62%"><span>Western</span><b>1,543 (12.4%)</b></p>
+                  <p style="--w:54%"><span>Eastern</span><b>1,342 (10.8%)</b></p>
+                  <p style="--w:32%"><span>Bono</span><b>789 (6.3%)</b></p>
+                  <p style="--w:27%"><span>Volta</span><b>678 (5.4%)</b></p>
+                  <p style="--w:20%"><span>Upper East</span><b>512 (4.1%)</b></p>
+                  <p style="--w:16%"><span>Upper West</span><b>415 (3.3%)</b></p>
+                  <p style="--w:13%"><span>Central</span><b>336 (2.7%)</b></p>
+                </div>
+                <footer>Total 12,458</footer>
+              </article>
+
+              <article class="kpi-panel">
+                <h3>Participants by District (Top 10)</h3>
+                <div class="green-bars" id="dashDistrictBars">
+                  <p style="--w:100%"><span>Kumasi Metropolitan</span><b>842 (6.8%)</b></p>
+                  <p style="--w:74%"><span>Tamale Metropolitan</span><b>621 (5.0%)</b></p>
+                  <p style="--w:71%"><span>Accra Metropolitan</span><b>598 (4.8%)</b></p>
+                  <p style="--w:58%"><span>Sunyani Municipal</span><b>487 (3.9%)</b></p>
+                  <p style="--w:49%"><span>Wa Municipal</span><b>412 (3.3%)</b></p>
+                  <p style="--w:45%"><span>Cape Coast Municipal</span><b>378 (3.0%)</b></p>
+                  <p style="--w:42%"><span>Techiman Municipal</span><b>356 (2.9%)</b></p>
+                  <p style="--w:39%"><span>Ho Municipal</span><b>331 (2.7%)</b></p>
+                  <p style="--w:35%"><span>Koforidua Municipal</span><b>298 (2.4%)</b></p>
+                  <p style="--w:33%"><span>Takoradi Municipal</span><b>276 (2.2%)</b></p>
+                </div>
+                <footer>Total 4,599</footer>
+              </article>
+              <article class="kpi-panel community-table">
+                <h3>Participants by Community (Top 10)</h3>
+                <table><thead><tr><th>#</th><th>Community</th><th>District</th><th>Region</th><th>Participants</th></tr></thead><tbody>
+                  <tr><td>1</td><td>Nima</td><td>Accra Metropolitan</td><td>Greater Accra</td><td>254</td></tr>
+                  <tr><td>2</td><td>Zongo</td><td>Tamale Metropolitan</td><td>Northern</td><td>233</td></tr>
+                  <tr><td>3</td><td>Agogo</td><td>Asante Akim North</td><td>Ashanti</td><td>198</td></tr>
+                  <tr><td>4</td><td>Abrepo</td><td>Kumasi Metropolitan</td><td>Ashanti</td><td>187</td></tr>
+                  <tr><td>5</td><td>New Takoradi</td><td>Sekondi-Takoradi</td><td>Western</td><td>176</td></tr>
+                  <tr><td>6</td><td>Berekum</td><td>Berekum Municipal</td><td>Bono</td><td>164</td></tr>
+                  <tr><td>7</td><td>Hohoe</td><td>Hohoe Municipal</td><td>Volta</td><td>152</td></tr>
+                  <tr><td>8</td><td>Yendi</td><td>Yendi Municipal</td><td>Northern</td><td>149</td></tr>
+                  <tr><td>9</td><td>Kasoa</td><td>Awutu Senya East</td><td>Central</td><td>146</td></tr>
+                  <tr><td>10</td><td>Wa</td><td>Wa Municipal</td><td>Upper West</td><td>141</td></tr>
+                </tbody></table>
+                <footer>1 - 10 / 128 <span>‹ ›</span></footer>
+              </article>
+              <article class="kpi-panel small-bars"><h3>Employment Category</h3><div class="teal-bars" id="dashEmploymentCategoryBars"><p style="--w:100%"><span>Unemployed</span><b>6,214 (49.9%)</b></p><p style="--w:52%"><span>Informal Worker</span><b>3,245 (26.0%)</b></p><p style="--w:25%"><span>Student</span><b>1,524 (12.2%)</b></p><p style="--w:14%"><span>Self-Employed</span><b>879 (7.1%)</b></p><p style="--w:10%"><span>Employed</span><b>596 (4.8%)</b></p></div><footer>Total 12,458</footer></article>
+              <article class="kpi-panel small-bars"><h3>Employment Type</h3><div class="hbar-list compact" id="dashEmploymentTypeBars"><p style="--w:100%"><span>Not Working</span><b>6,214 (49.9%)</b></p><p style="--w:35%"><span>Full-time</span><b>2,145 (17.2%)</b></p><p style="--w:32%"><span>Part-time</span><b>1,987 (15.9%)</b></p><p style="--w:25%"><span>Self-Employed</span><b>1,523 (12.2%)</b></p><p style="--w:10%"><span>Apprentice</span><b>589 (4.7%)</b></p></div><footer>Total 12,458</footer></article>
+            </section>
+          </main>
         </div>
-        <a
-          class="report-open-link"
-          href="https://datastudio.google.com/embed/reporting/52f73fa2-60fb-4d3f-af50-47b53c2242ed/page/uUWxF"
-          target="_blank"
-          rel="noopener"
-        >Open Full Screen</a>
+
+        <footer class="kpi-foot">
+          <span id="dashUpdatedAt">Last updated: May 7, 2026 10:57 AM</span>
+          <span>Data source: HAPPY Program Data Collection Tool</span>
+          <span>Note: Percentages are calculated based on total participants (12,458)</span>
+        </footer>
       </div>
-      <iframe
-        class="looker-report-frame"
-        src="https://datastudio.google.com/embed/reporting/52f73fa2-60fb-4d3f-af50-47b53c2242ed/page/uUWxF"
-        frameborder="0"
-        allowfullscreen
-        sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox">
-      </iframe>
     </div>
   </div>
 

@@ -53,7 +53,7 @@ const CONFIG = {
 let formState = {
   collectorName: '', deviceId: '', regionCounter: {}, globalSequence: 0, isSubmitting: false, isSyncing: false, isAdmin: false, adminPassword: '',
   token: '', participant: null, lockedSections: new Set(), entryMode: '', selectedContinuationStage: '', consentSigned: false, consentDrawing: false, consentContext: null,
-  pendingAdminView: 'sheet', pendingAdminContinuationStage: ''
+  pendingAdminView: 'sheet', pendingAdminContinuationStage: '', masterSheetData: [], currentView: 'form', sheetRefreshTimer: null, isSheetLoading: false
 };
 
 const CAPACITY_FIELD_IDS = [
@@ -126,8 +126,12 @@ function setupEventListeners() {
   window.addEventListener('online', () => {
     updateOnlineStatus();
     syncPendingSubmissions();
+    refreshAdminDataNow();
   });
   window.addEventListener('offline', updateOnlineStatus);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshAdminDataNow();
+  });
   // Prevent form submit on Enter in non-textarea fields
   document.getElementById('mainForm').addEventListener('keypress', e => {
     if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') e.preventDefault();
@@ -139,12 +143,14 @@ function setupEventListeners() {
 
 // ===== VIEW SWITCHING =====
 function setView(view) {
+  formState.currentView = view;
   document.getElementById('view-form').classList.toggle('hidden', view !== 'form');
   document.getElementById('view-sheet').classList.toggle('hidden', view !== 'sheet');
   document.getElementById('view-report')?.classList.toggle('hidden', view !== 'report');
   document.getElementById('tab-form').classList.toggle('active', view === 'form');
   document.getElementById('tab-sheet').classList.toggle('active', view === 'sheet');
   document.getElementById('tab-report')?.classList.toggle('active', view === 'report');
+  updateAdminAutoRefresh();
 }
 
 async function initializeContinuation() {
@@ -552,6 +558,9 @@ function applyParticipantRecord(record) {
   };
 
   Object.entries(record).forEach(([key, value]) => setValue(key, value));
+  hydrateParticipantDependentFields(record);
+  hydrateCheckboxGroup('modules', record.modules);
+  hydrateCheckboxGroup('digitalSkills', record.digitalSkills);
 
   if (!record.surname && record.consentName) {
     const parts = String(record.consentName).trim().split(/\s+/);
@@ -567,6 +576,68 @@ function applyParticipantRecord(record) {
   const locked = String(record.lockedSections || '').split(',').filter(Boolean);
   formState.lockedSections = new Set(locked);
   applySectionLocks();
+}
+
+function hydrateParticipantDependentFields(record) {
+  if (record.region) {
+    setSelectValue('region', record.region);
+    populateDistricts('region', 'district');
+    setSelectValue('district', record.district);
+  }
+  if (record.workRegion) {
+    setSelectValue('workRegion', record.workRegion);
+    populateDistricts('workRegion', 'workDistrict');
+    setSelectValue('workDistrict', record.workDistrict);
+  }
+  if (record.placementRegion) {
+    setSelectValue('placementRegion', record.placementRegion);
+    populateDistricts('placementRegion', 'placementDistrict');
+    setSelectValue('placementDistrict', record.placementDistrict);
+  }
+  if (record.sector) {
+    setSelectValue('sector', record.sector);
+    populateIndustries();
+    setSelectValue('industry', record.industry);
+    populateJobTypes();
+    setSelectValue('jobType', record.jobType);
+    populateJobRoles();
+    setSelectValue('jobRole', record.jobRole);
+  }
+  if (record.plSector) {
+    setSelectValue('plSector', record.plSector);
+    populatePlacementIndustries();
+    setSelectValue('plIndustry', record.plIndustry);
+    populatePlacementJobTypes();
+    setSelectValue('plJobType', record.plJobType);
+    populatePlacementJobRoles();
+    setSelectValue('plJobRole', record.plJobRole);
+  }
+  toggleRefugeeField();
+  toggleDisplacementFields();
+  toggleDisabilityField();
+  handleIdTypeChange();
+  toggleCurrentEmploymentFields();
+}
+
+function setSelectValue(id, value) {
+  const el = document.getElementById(id);
+  if (!el || value === undefined || value === null || String(value) === '') return;
+  const stringValue = String(value);
+  if (!Array.from(el.options).some(option => option.value === stringValue)) {
+    const opt = document.createElement('option');
+    opt.value = stringValue;
+    opt.textContent = stringValue;
+    el.appendChild(opt);
+  }
+  el.value = stringValue;
+}
+
+function hydrateCheckboxGroup(name, value) {
+  const selected = String(value || '').split(',').map(item => item.trim()).filter(Boolean);
+  if (!selected.length) return;
+  document.querySelectorAll(`input[name="${name}"]`).forEach(input => {
+    input.checked = selected.includes(input.value);
+  });
 }
 
 function showEditNotice() {
@@ -621,7 +692,7 @@ function showAdminLogin(targetView = 'sheet') {
   formState.pendingAdminView = targetView === 'report' ? 'report' : 'sheet';
   if (formState.isAdmin) {
     setView(formState.pendingAdminView);
-    if (formState.pendingAdminView === 'sheet') loadSheetData();
+    if (formState.pendingAdminView === 'sheet' || formState.pendingAdminView === 'report') loadSheetData();
     return;
   }
   document.getElementById('adminModal').classList.remove('hidden');
@@ -662,9 +733,11 @@ async function verifyAdmin() {
     const data = await fetchProtectedSheetData(pwd);
     formState.isAdmin = true;
     formState.adminPassword = pwd;
+    formState.masterSheetData = data;
     closeAdminLogin();
     showToast('✅ Admin access granted', 'success');
     renderSheet(data);
+    updateKpiDashboard(data);
     applyWorkflowMode();
     if (formState.pendingAdminContinuationStage) {
       const stage = formState.pendingAdminContinuationStage;
@@ -1094,6 +1167,7 @@ async function syncPendingSubmissions() {
       queue = queue.filter(pending => pending.id !== item.id);
       localStorage.setItem(CONFIG.QUEUE_KEY, JSON.stringify(queue));
       updateSyncPanel('syncing', queue.length ? `Syncing ${queue.length} pending record(s)...` : 'Finalizing sync...');
+      refreshAdminDataNow();
     } catch (err) {
       queue = queue.map(pending => {
         if (pending.id !== item.id) return pending;
@@ -1119,6 +1193,7 @@ async function syncPendingSubmissions() {
     showToast('All queued records synced to Google Sheets.', 'success');
     updateIds();
     updateOnlineStatus();
+    refreshAdminDataNow();
   }
   updateSyncPanel();
 }
@@ -1195,6 +1270,7 @@ async function handleSubmit(e) {
         updateSyncPanel('online', 'Last record submitted to Google Sheets.');
         showSubmissionComplete(result.referenceId || result.participantId || formData.submissionId, 'Saved to Google Sheets.', 'submitted');
         showToast('Submitted to Google Sheets.', 'success');
+        refreshAdminDataNow();
       } catch (syncErr) {
         queueSubmission(formData, syncErr.message);
         updateSyncPanel('pending', `${getPendingSubmissions().length} record(s) queued. Last error: ${syncErr.message}`);
@@ -1484,17 +1560,39 @@ async function uploadOptionalCv() {
 }
 
 // ===== MASTER SHEET FUNCTIONS =====
-async function loadSheetData() {
+async function loadSheetData(options = {}) {
   if (!formState.isAdmin) { showAdminLogin(); return; }
+  if (formState.isSheetLoading) return;
+  formState.isSheetLoading = true;
   const status = document.getElementById('sheetBody').querySelector('td');
-  if (status) status.textContent = '🔄 Loading from Google Sheets...';
+  if (status && !options.silent) status.textContent = '🔄 Loading from Google Sheets...';
   try {
     const data = await fetchProtectedSheetData(formState.adminPassword);
+    formState.masterSheetData = data;
     renderSheet(data);
+    updateKpiDashboard(data);
   } catch (err) {
     console.error('Sheet load error:', err);
-    showToast(`❌ ${err.message}`, 'error');
+    if (!options.silent) showToast(`❌ ${err.message}`, 'error');
+  } finally {
+    formState.isSheetLoading = false;
   }
+}
+
+function updateAdminAutoRefresh() {
+  if (formState.sheetRefreshTimer) {
+    clearInterval(formState.sheetRefreshTimer);
+    formState.sheetRefreshTimer = null;
+  }
+  if (!formState.isAdmin || !['sheet', 'report'].includes(formState.currentView)) return;
+  formState.sheetRefreshTimer = setInterval(() => {
+    if (!document.hidden && navigator.onLine) loadSheetData({ silent: true });
+  }, 30000);
+}
+
+function refreshAdminDataNow() {
+  if (!formState.isAdmin || !['sheet', 'report'].includes(formState.currentView) || !navigator.onLine) return;
+  loadSheetData({ silent: true });
 }
 async function fetchProtectedSheetData(adminPassword) {
   let result;
@@ -1561,19 +1659,124 @@ function fetchProtectedSheetDataJsonp(adminPassword) {
 function renderSheet(data) {
   const head = document.getElementById('sheetHead');
   const body = document.getElementById('sheetBody');
-  if (!data?.length) { body.innerHTML = '<tr><td colspan="25" class="text-center py-6 text-slate-500">No data</td></tr>'; return; }
-  // Headers
+  if (!data?.length) {
+    head.innerHTML = '';
+    body.innerHTML = '<tr><td colspan="25" class="text-center py-6 text-slate-500">No collected participant data found in the Master sheet.</td></tr>';
+    return;
+  }
+
+  const priorityColumns = [
+    'participantId', 'currentStage', 'consentStatus', 'participantInfoStatus',
+    'capacityBuildingStatus', 'jobPlacementStatus', 'cvStatus', 'collectorName',
+    'submissionTimestamp', 'onboardingDate', 'implementingPartner', 'region',
+    'district', 'community', 'surname', 'firstName', 'otherNames', 'sex', 'dob',
+    'age', 'participantTypeAge', 'telephone', 'refugeeStatus',
+    'disabilityStatus', 'employmentStatus', 'employmentType',
+    'employmentCategory', 'hasCv', 'cvUploadName', 'lastUpdatedAt'
+  ];
+  const allColumns = Array.from(data.reduce((set, row) => {
+    Object.keys(row || {}).forEach(key => set.add(key));
+    return set;
+  }, new Set()));
+  const columns = priorityColumns
+    .filter(column => allColumns.includes(column))
+    .concat(allColumns.filter(column => !priorityColumns.includes(column)));
+
   head.innerHTML = '';
   const trH = document.createElement('tr');
-  Object.keys(data[0]).forEach(k => { const th = document.createElement('th'); th.textContent = k; trH.appendChild(th); });
+  columns.forEach(k => { const th = document.createElement('th'); th.textContent = humanizeSheetHeader(k); trH.appendChild(th); });
   head.appendChild(trH);
-  // Rows
+
   body.innerHTML = '';
   data.forEach(row => {
     const tr = document.createElement('tr');
-    Object.values(row).forEach(v => { const td = document.createElement('td'); td.textContent = v || '-'; tr.appendChild(td); });
+    columns.forEach(column => {
+      const td = document.createElement('td');
+      td.textContent = formatSheetCell(row[column]);
+      tr.appendChild(td);
+    });
     body.appendChild(tr);
   });
+}
+
+function humanizeSheetHeader(key) {
+  return String(key || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/^./, char => char.toUpperCase());
+}
+
+function formatSheetCell(value) {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date.toLocaleString();
+  }
+  return String(value);
+}
+
+function updateKpiDashboard(data) {
+  if (!Array.isArray(data) || !data.length) return;
+  const records = data.filter(row => row && Object.values(row).some(Boolean));
+  const total = records.length;
+  if (!total) return;
+
+  const count = (field, value) => records.filter(row => String(row[field] || '').toLowerCase() === String(value).toLowerCase()).length;
+  const hasAny = fields => records.filter(row => fields.some(field => String(row[field] || '').trim())).length;
+  const pct = value => total ? `${((value / total) * 100).toFixed(1)}%` : '0.0%';
+  const byField = field => records.reduce((acc, row) => {
+    const key = String(row[field] || 'Unspecified').trim() || 'Unspecified';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const consent = count('consentStatus', 'submitted');
+  const registered = count('participantInfoStatus', 'submitted') || hasAny(['firstName', 'surname', 'telephone']);
+  const capacity = count('capacityBuildingStatus', 'submitted');
+  const placement = count('jobPlacementStatus', 'submitted');
+  const cvUploaded = records.filter(row => String(row.cvStatus || '').toLowerCase().includes('uploaded') || String(row.hasCv || '').toLowerCase() === 'yes').length;
+
+  setDashText('dashTotalParticipants', total.toLocaleString());
+  setDashText('dashConsentComplete', consent.toLocaleString());
+  setDashText('dashConsentPct', pct(consent));
+  setDashText('dashRegistrationSubmitted', registered.toLocaleString());
+  setDashText('dashRegistrationPct', pct(registered));
+  setDashText('dashCapacitySubmitted', capacity.toLocaleString());
+  setDashText('dashCapacityPct', pct(capacity));
+  setDashText('dashPlacementSubmitted', placement.toLocaleString());
+  setDashText('dashPlacementPct', pct(placement));
+  setDashText('dashCvUploaded', cvUploaded.toLocaleString());
+  setDashText('dashCvPct', pct(cvUploaded));
+  setDashText('dashUpdatedAt', `Last updated: ${new Date().toLocaleString()}`);
+
+  renderDashboardBars('dashRegionBars', byField('region'), total, '#2563eb', 10);
+  renderDashboardBars('dashDistrictBars', byField('district'), total, '#2f9e5b', 10);
+  renderDashboardBars('dashEmploymentCategoryBars', byField('employmentCategory'), total, '#1198a0', 5);
+  renderDashboardBars('dashEmploymentTypeBars', byField('employmentType'), total, '#2563eb', 5);
+}
+
+function setDashText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function renderDashboardBars(id, counts, total, color, limit) {
+  const container = document.getElementById(id);
+  if (!container) return;
+  const rows = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit);
+  const max = Math.max(...rows.map(([, value]) => value), 1);
+  container.innerHTML = rows.map(([label, value]) => {
+    const width = Math.max(8, (value / max) * 100);
+    const percentage = total ? ((value / total) * 100).toFixed(1) : '0.0';
+    return `<p style="--w:${width}%;--bar:${color}"><span>${escapeHtml(label)}</span><b>${value.toLocaleString()} (${percentage}%)</b></p>`;
+  }).join('');
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
 }
 function exportSheetData() {
   showToast('📥 Export requires backend support', 'info');

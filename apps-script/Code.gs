@@ -290,7 +290,7 @@ function saveParticipantInfo(payload, explicitSection) {
   const existing = isNew ? {} : rowToObject(headers, sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0]);
   const participantId = existing.participantId || payload.participantId || generateParticipantId(sheet, headers);
   const incoming = pickKnownHeaders(payload, headers);
-  enforceSectionScope(incoming, explicitSection);
+  enforceSectionScope(incoming, explicitSection, existing);
   normalizeParticipantInfoDefaults(incoming, explicitSection);
   const blockedSections = enforceParticipantLocks(existing, incoming);
   const capacityStatus = resolveCapacityStatus(existing, incoming, explicitSection);
@@ -309,9 +309,9 @@ function saveParticipantInfo(payload, explicitSection) {
     lastUpdatedBy: payload.actor || payload.collectorName || 'participant',
     createdAt: existing.createdAt || now,
     createdBy: existing.createdBy || 'registration',
-    participantPhoneNormalized: phone,
-    participantEmailNormalized: email,
-    ghanaCardNormalized: ghanaCard,
+    participantPhoneNormalized: explicitSection ? existing.participantPhoneNormalized : phone,
+    participantEmailNormalized: explicitSection ? existing.participantEmailNormalized : email,
+    ghanaCardNormalized: explicitSection ? existing.ghanaCardNormalized : ghanaCard,
     syncStatus: payload.syncStatus || 'synced'
   });
 
@@ -347,17 +347,27 @@ function saveParticipantInfo(payload, explicitSection) {
   };
 }
 
-function enforceSectionScope(incoming, explicitSection) {
+function enforceSectionScope(incoming, explicitSection, existing) {
   if (explicitSection === 'capacity') {
+    preserveParticipantSectionFields(incoming, CAPACITY_BUILDING_FIELDS, existing);
     removeIncomingFields(incoming, JOB_PLACEMENT_FIELDS);
     return;
   }
   if (explicitSection === 'placement') {
+    preserveParticipantSectionFields(incoming, JOB_PLACEMENT_FIELDS, existing);
     removeIncomingFields(incoming, CAPACITY_BUILDING_FIELDS);
     return;
   }
   removeIncomingFields(incoming, CAPACITY_BUILDING_FIELDS);
   removeIncomingFields(incoming, JOB_PLACEMENT_FIELDS);
+}
+
+function preserveParticipantSectionFields(incoming, allowedSectionFields, existing) {
+  const allowed = new Set(allowedSectionFields);
+  REGISTRATION_HEADERS.forEach(header => {
+    if (!allowed.has(header)) delete incoming[header];
+  });
+  if (existing && existing.participantInfoStatus) incoming.participantInfoStatus = existing.participantInfoStatus;
 }
 
 function normalizeParticipantInfoDefaults(incoming, explicitSection) {
