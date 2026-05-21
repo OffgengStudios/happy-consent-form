@@ -1,19 +1,21 @@
-const SPREADSHEET_ID = '15wqqAiJIbw6lfzwZFG_fGiklG-jFMCCpQhkaWVtPSzA';
+const SPREADSHEET_ID = '1D_LyM6SQFp2GjU88ytXe1yPkePuPxM4OeI0lgpzs8O4';
 const LEGACY_SHEET_GID = 0;
 const MASTER_SHEET_NAME = 'Master';
 const AUDIT_SHEET_NAME = 'Audit_Log';
 const CV_RESULTS_SHEET_NAME = 'CV_Parse_Results';
 const JSON_MIME = ContentService.MimeType.JSON;
 const PARTICIPANT_PREFIX = 'HAPPY-2026-';
+const CONSENT_SIGNATURE_FOLDER_ID = '1uczj5UbNUqY0-j6Rn7bosXO13LvvACmV';
 const CV_UPLOAD_FOLDER_ID = '1WEqqBy9AvnzMAkd6dJBXeaO_IqnO1bSc';
-const BACKEND_VERSION = '2026-05-08-consent-email';
+const BACKEND_VERSION = '2026-05-21-consent-signature-folder';
 
 const LIFECYCLE_HEADERS = [
   'participantId', 'legacyParticipantId', 'continuationTokenHash',
   'continuationTokenCreatedAt', 'consentStatus', 'consentSubmittedAt',
   'consentSubmissionId', 'consentName', 'consentPhone', 'consentEmail',
   'consentEmailSent', 'consentEmailSentAt', 'consentEmailSendError',
-  'consentVenue', 'participantInfoStatus', 'capacityBuildingStatus',
+  'consentVenue', 'consentSignatureFileUrl', 'consentSignatureFileId',
+  'consentSignatureFileName', 'participantInfoStatus', 'capacityBuildingStatus',
   'jobPlacementStatus', 'currentStage', 'lockedSections', 'cvStatus',
   'cvUploadedAt', 'cvFileUrl', 'cvFileId', 'cvParserCandidateId', 'cvParsedAt',
   'cvTemplateFolderAccessed', 'lastUpdatedAt', 'lastUpdatedBy', 'createdAt',
@@ -132,6 +134,7 @@ function initConsent(payload) {
   const rawToken = createToken();
   const tokenHash = hashValue(rawToken);
   const registrationUrl = buildRegistrationUrl(rawToken, payload.appUrl);
+  const consentSubmissionId = payload.submissionId || `CONSENT-${Date.now()}`;
   const phone = normalizePhone(payload.phone);
   const email = normalizeEmail(payload.email);
   let rowIndex = findParticipantRow(sheet, headers, {
@@ -145,17 +148,21 @@ function initConsent(payload) {
   if (rowIndex > 0) {
     const existing = rowToObject(headers, sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0]);
     participantId = existing.participantId || generateParticipantId(sheet, headers);
+    const signatureFile = saveConsentSignatureToDrive(payload, participantId);
     updateRow(sheet, headers, rowIndex, {
       participantId,
       continuationTokenHash: tokenHash,
       continuationTokenCreatedAt: now,
       consentStatus: 'complete',
       consentSubmittedAt: payload.timestamp || now,
-      consentSubmissionId: payload.submissionId || `CONSENT-${Date.now()}`,
+      consentSubmissionId,
       consentName: payload.name || '',
       consentPhone: payload.phone || '',
       consentEmail: payload.email || '',
       consentVenue: payload.venue || '',
+      consentSignatureFileUrl: signatureFile.url,
+      consentSignatureFileId: signatureFile.id,
+      consentSignatureFileName: signatureFile.name,
       currentStage: existing.currentStage || 'registration',
       lastUpdatedAt: now,
       lastUpdatedBy: 'participant',
@@ -164,6 +171,7 @@ function initConsent(payload) {
     });
   } else {
     participantId = generateParticipantId(sheet, headers);
+    const signatureFile = saveConsentSignatureToDrive(payload, participantId);
     const record = blankRecord(headers);
     Object.assign(record, {
       participantId,
@@ -171,11 +179,14 @@ function initConsent(payload) {
       continuationTokenCreatedAt: now,
       consentStatus: 'complete',
       consentSubmittedAt: payload.timestamp || now,
-      consentSubmissionId: payload.submissionId || `CONSENT-${Date.now()}`,
+      consentSubmissionId,
       consentName: payload.name || '',
       consentPhone: payload.phone || '',
       consentEmail: payload.email || '',
       consentVenue: payload.venue || '',
+      consentSignatureFileUrl: signatureFile.url,
+      consentSignatureFileId: signatureFile.id,
+      consentSignatureFileName: signatureFile.name,
       participantInfoStatus: 'not_started',
       capacityBuildingStatus: 'not_started',
       jobPlacementStatus: 'not_started',
@@ -207,6 +218,7 @@ function initConsent(payload) {
     participantId,
     token: rawToken,
     registrationUrl,
+    consentSubmissionId,
     name: payload.name || '',
     email
   });
@@ -444,6 +456,25 @@ function saveCvFileToDrive(payload, participantId) {
   };
 }
 
+function saveConsentSignatureToDrive(payload, participantId) {
+  const match = String(payload.signature || '').match(/^data:image\/png;base64,(.+)$/);
+  if (!match) throw new Error('Invalid consent signature payload.');
+
+  const bytes = Utilities.base64Decode(match[1]);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const safeName = sanitizeFileName(payload.name || participantId || 'participant');
+  const fileName = `${participantId}_${timestamp}_${safeName}_consent-signature.png`;
+  const blob = Utilities.newBlob(bytes, 'image/png', fileName);
+  const folder = DriveApp.getFolderById(CONSENT_SIGNATURE_FOLDER_ID);
+  const file = folder.createFile(blob);
+
+  return {
+    id: file.getId(),
+    url: file.getUrl(),
+    name: file.getName()
+  };
+}
+
 function sanitizeFileName(value) {
   return String(value || 'participant-cv')
     .replace(/[\\/:*?"<>|#%{}~&]/g, '-')
@@ -575,7 +606,12 @@ function getProtectedSheetData(password, sheetName) {
 }
 
 function getMasterSheet() {
-  return getOrCreateSheet(MASTER_SHEET_NAME, MASTER_HEADERS);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheets().find(item => item.getSheetId() === LEGACY_SHEET_GID)
+    || ss.getSheetByName(MASTER_SHEET_NAME)
+    || ss.insertSheet(MASTER_SHEET_NAME);
+  ensureHeaders(sheet, MASTER_HEADERS);
+  return sheet;
 }
 
 function getLegacySheet() {
@@ -817,6 +853,9 @@ function sendConsentParticipantEmail(details) {
       'Your Participant ID is:',
       details.participantId,
       '',
+      'Your Consent ID is:',
+      details.consentSubmissionId,
+      '',
       'Please keep this ID safe. You will use it to continue your registration, update participant information, upload a CV, or continue to capacity building/job placement.',
       '',
       `Continuation link: ${details.registrationUrl}`,
@@ -848,12 +887,17 @@ function getAdminPassword() {
 }
 
 function authorizeDriveAccess() {
-  const folder = DriveApp.getFolderById(CV_UPLOAD_FOLDER_ID);
-  const testFile = folder.createFile(
+  const cvFolder = DriveApp.getFolderById(CV_UPLOAD_FOLDER_ID);
+  const cvTestFile = cvFolder.createFile(
     Utilities.newBlob('HAPPY Drive authorization test', 'text/plain', 'happy-drive-auth-test.txt')
   );
-  testFile.setTrashed(true);
-  return `Drive write access OK: ${folder.getName()}`;
+  cvTestFile.setTrashed(true);
+  const signatureFolder = DriveApp.getFolderById(CONSENT_SIGNATURE_FOLDER_ID);
+  const signatureTestFile = signatureFolder.createFile(
+    Utilities.newBlob('HAPPY consent signature authorization test', 'text/plain', 'happy-signature-drive-auth-test.txt')
+  );
+  signatureTestFile.setTrashed(true);
+  return `Drive write access OK: CV folder ${cvFolder.getName()}, signature folder ${signatureFolder.getName()}`;
 }
 
 function authorizeEmailAccess() {
