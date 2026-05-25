@@ -165,18 +165,24 @@ async function initializeContinuation() {
     return;
   }
 
-  if (token) {
-    await loadParticipantByToken(token);
-  } else {
-    await loadParticipantById(participantId);
-  }
+  try {
+    if (token) {
+      await loadParticipantByToken(token);
+    } else {
+      await loadParticipantById(participantId);
+    }
 
-  if (mode === 'capacity' || mode === 'placement') {
-    await continueToStage(mode);
-  } else {
-    formState.entryMode = 'registration';
-    revealParticipantForm();
-    showEditNotice();
+    if (mode === 'capacity' || mode === 'placement') {
+      await continueToStage(mode);
+    } else {
+      formState.entryMode = 'registration';
+      revealParticipantForm();
+      showEditNotice();
+      showToast(`Welcome back, ${formState.participant?.consentName || 'participant'}. Complete your registration below.`, 'success');
+    }
+  } catch (err) {
+    showToast(`Could not load your registration link: ${err.message}`, 'error');
+    window.history.replaceState({}, '', window.location.pathname);
   }
 }
 
@@ -222,6 +228,7 @@ function extractContinuationToken(value) {
 
 function revealParticipantForm() {
   document.getElementById('entryChoiceScreen')?.classList.add('hidden');
+  document.getElementById('consentStep')?.classList.add('hidden');
   document.getElementById('mainForm')?.classList.remove('hidden');
   applyWorkflowMode();
 }
