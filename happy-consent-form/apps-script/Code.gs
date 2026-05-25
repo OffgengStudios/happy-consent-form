@@ -1231,8 +1231,10 @@ function sendConsentParticipantEmail(details) {
 
 function buildRegistrationUrl(token, fallbackBase) {
   const configured = PropertiesService.getScriptProperties().getProperty('REGISTRATION_URL');
-  const base = configured || fallbackBase || 'https://murphy-richard.github.io/happy-kollekt/';
-  return `${base}${base.indexOf('?') >= 0 ? '&' : '?'}token=${encodeURIComponent(token)}`;
+  let base = configured || fallbackBase || 'https://murphy-richard.github.io/happy-kollekt/';
+  if (!base.startsWith('http')) base = 'https://murphy-richard.github.io/happy-kollekt/';
+  if (!base.endsWith('/')) base += '/';
+  return `${base}?token=${encodeURIComponent(token)}`;
 }
 
 function getAdminPassword() {
