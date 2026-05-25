@@ -55,17 +55,18 @@ let formState = {
   adminPassword: '',
   masterSheetData: [],
   currentView: 'form',
-  isSheetLoading: false
+  isSheetLoading: false,
+  accessMode: null // 'token' | 'capacity-existing' | 'capacity-new' | 'admin'
 };
 
 let db = JSON.parse(localStorage.getItem(CONFIG.LOCAL_DB_KEY)) || [];
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
-  initializeForm();
   setupEventListeners();
   updatePartnerDisplays();
   syncPendingSubmissions();
+  initializeFromUrlParams();
 });
 
 function initializeForm() {
@@ -84,6 +85,121 @@ function initializeForm() {
   toggleCapacityFields(false);
   togglePlacementFields(false);
   updateOnlineStatus();
+}
+
+// ===== LOCK / UNLOCK =====
+function initializeFromUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  const mode = params.get('mode');
+
+  if (token) {
+    unlockWithToken(token);
+  } else if (mode === 'capacity') {
+    showCapacityEntryScreen();
+  } else {
+    showLockedScreen();
+  }
+}
+
+function showLockedScreen() {
+  document.getElementById('lockedScreen').classList.remove('hidden');
+  document.getElementById('view-form').classList.add('hidden');
+  document.getElementById('capacityEntryScreen').classList.add('hidden');
+}
+
+function showCapacityEntryScreen() {
+  document.getElementById('capacityEntryScreen').classList.remove('hidden');
+  document.getElementById('lockedScreen').classList.add('hidden');
+  document.getElementById('view-form').classList.add('hidden');
+}
+
+function selectCapacityMode(mode) {
+  document.getElementById('btnHasId').style.borderColor = mode === 'existing' ? '#5B45E8' : '#e2e8f0';
+  document.getElementById('btnNoId').style.borderColor = mode === 'new' ? '#5B45E8' : '#e2e8f0';
+  if (mode === 'existing') {
+    document.getElementById('participantIdLookup').classList.remove('hidden');
+  } else {
+    document.getElementById('capacityEntryScreen').classList.add('hidden');
+    formState.accessMode = 'capacity-new';
+    initializeForm();
+    showSections({ A: true, B: true, C: true, D: false });
+    document.getElementById('view-form').classList.remove('hidden');
+  }
+}
+
+async function lookupAndContinue() {
+  const pid = document.getElementById('lookupParticipantId').value.trim();
+  const errEl = document.getElementById('lookupError');
+  errEl.classList.add('hidden');
+  if (!pid) { errEl.textContent = 'Please enter your Participant ID.'; errEl.classList.remove('hidden'); return; }
+
+  try {
+    const result = await apiAction('getParticipantById', { participantId: pid });
+    if (!result || !result.participantId) throw new Error('Participant not found.');
+    document.getElementById('capacityEntryScreen').classList.add('hidden');
+    formState.accessMode = 'capacity-existing';
+    initializeForm();
+    prefillParticipantInfo(result);
+    lockSectionB();
+    showSections({ A: true, B: true, C: true, D: false });
+    document.getElementById('view-form').classList.remove('hidden');
+  } catch (err) {
+    errEl.textContent = err.message || 'Could not find that Participant ID. Please check and try again.';
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function unlockWithToken(token) {
+  try {
+    const result = await apiAction('getParticipantByToken', { token });
+    if (!result || !result.participantId) throw new Error('Invalid or expired link.');
+    formState.accessMode = 'token';
+    initializeForm();
+    prefillParticipantInfo(result);
+    showSections({ A: true, B: true, C: false, D: false });
+    document.getElementById('view-form').classList.remove('hidden');
+  } catch (err) {
+    document.getElementById('lockedScreen').classList.remove('hidden');
+    document.getElementById('lockedScreen').querySelector('p').textContent =
+      'Your link is invalid or has expired. Please contact your HAPPY Program field officer.';
+  }
+}
+
+function showSections({ A, B, C, D }) {
+  document.getElementById('sectionA').classList.toggle('hidden', !A);
+  document.getElementById('sectionB').classList.toggle('hidden', !B);
+  document.getElementById('sectionC').classList.toggle('hidden', !C);
+  document.getElementById('sectionD').classList.toggle('hidden', !D);
+}
+
+function lockSectionB() {
+  const section = document.getElementById('sectionB');
+  section.querySelectorAll('input, select, textarea').forEach(el => {
+    el.disabled = true;
+  });
+  const notice = document.createElement('p');
+  notice.textContent = 'Participant information loaded from existing record.';
+  notice.style.cssText = 'font-size:0.75rem;color:#7c3aed;margin-bottom:0.5rem;font-weight:600;';
+  section.querySelector('h2').insertAdjacentElement('afterend', notice);
+}
+
+function prefillParticipantInfo(data) {
+  const fields = [
+    'participantId','hamisId','onboardingDate','implementingPartner','region','district',
+    'community','locationStatus','surname','firstName','otherNames','sex','dob',
+    'telephone','idType','ghanaCardId','voterId','refugeeStatus','nationality',
+    'displacementStatus','displacementReason','originalCommunity','hostCommunity',
+    'disabilityStatus','disabilitySpecify','educationLevel','employmentStatus',
+    'currentOccupation','monthlyIncome','incomeFrequency','sector','industry',
+    'jobType','jobRole','workRegion','workDistrict'
+  ];
+  fields.forEach(f => {
+    const el = document.getElementById(f);
+    if (el && data[f] !== undefined) el.value = data[f];
+  });
+  if (data.age) document.getElementById('age').value = data.age;
+  if (data.participantTypeAge) document.getElementById('participantTypeAge').value = data.participantTypeAge;
 }
 
 function setupEventListeners() {
@@ -132,10 +248,17 @@ async function verifyAdmin() {
   try {
     const data = await fetchProtectedSheetData(pwd);
     formState.isAdmin = true;
+    formState.accessMode = 'admin';
     formState.adminPassword = pwd;
     formState.masterSheetData = data;
     closeAdminLogin();
     showToast('Admin access granted', 'success');
+    if (document.getElementById('view-form').classList.contains('hidden')) {
+      initializeForm();
+      showSections({ A: true, B: true, C: true, D: true });
+      document.getElementById('lockedScreen').classList.add('hidden');
+      document.getElementById('view-form').classList.remove('hidden');
+    }
     renderSheet(data);
     setView('sheet');
   } catch (err) {
@@ -645,7 +768,9 @@ function collectFormData() {
     currentlyEmployed: document.getElementById('currentlyEmployed').value,
     currentEmployer: document.getElementById('currentEmployer').value,
     currentJobRoleAlt: document.getElementById('currentJobRoleAlt').value,
-    currentIncomeAlt: document.getElementById('currentIncomeAlt').value
+    currentIncomeAlt: document.getElementById('currentIncomeAlt').value,
+    source: 'kollect',
+    accessMode: formState.accessMode || ''
   };
 }
 
