@@ -1,7 +1,6 @@
 ﻿// ===== CONFIGURATION =====
 const CONFIG = {
-  CONSENT_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwOJGkeb5cUERtNF0UVAoljCzZE6wnTSrk4lpzQtDzYXgpyhiZWhdUXph7OdrbAbf9l/exec',
-  REGISTRATION_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwAnymRCItipYfY66c96mrSRdJE_r2x84J7caU3LmdxRcUgUgmQTOOAe7jdbxm1UgJB/exec',
+  API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwAnymRCItipYfY66c96mrSRdJE_r2x84J7caU3LmdxRcUgUgmQTOOAe7jdbxm1UgJB/exec',
   CV_TEMPLATE_FOLDER_URL: 'https://drive.google.com/drive/folders/1Pybxl_uIF0v-gSewDlSntp5QXpvnfUfO',
   MAX_CV_UPLOAD_BYTES: 5 * 1024 * 1024,
   QUEUE_KEY: 'happy_pending_submissions',
@@ -165,24 +164,18 @@ async function initializeContinuation() {
     return;
   }
 
-  try {
-    if (token) {
-      await loadParticipantByToken(token);
-    } else {
-      await loadParticipantById(participantId);
-    }
+  if (token) {
+    await loadParticipantByToken(token);
+  } else {
+    await loadParticipantById(participantId);
+  }
 
-    if (mode === 'capacity' || mode === 'placement') {
-      await continueToStage(mode);
-    } else {
-      formState.entryMode = 'registration';
-      revealParticipantForm();
-      showEditNotice();
-      showToast(`Welcome back, ${formState.participant?.consentName || 'participant'}. Complete your registration below.`, 'success');
-    }
-  } catch (err) {
-    showToast(`Could not load your registration link: ${err.message}`, 'error');
-    window.history.replaceState({}, '', window.location.pathname);
+  if (mode === 'capacity' || mode === 'placement') {
+    await continueToStage(mode);
+  } else {
+    formState.entryMode = 'registration';
+    revealParticipantForm();
+    showEditNotice();
   }
 }
 
@@ -228,7 +221,6 @@ function extractContinuationToken(value) {
 
 function revealParticipantForm() {
   document.getElementById('entryChoiceScreen')?.classList.add('hidden');
-  document.getElementById('consentStep')?.classList.add('hidden');
   document.getElementById('mainForm')?.classList.remove('hidden');
   applyWorkflowMode();
 }
@@ -485,10 +477,13 @@ async function handleConsentSubmit(event) {
     if (formState.token) localStorage.setItem('happyContinuationToken', formState.token);
     document.getElementById('participantId').value = result.participantId || '';
     applyConsentToRegistration(payload, result.participantId);
-    setConsentStatus(`Consent saved. Participant ID: <strong>${result.participantId}</strong>. Redirecting to registration...`, 'success');
+    setConsentStatus(`Consent saved. Participant ID: <strong>${result.participantId}</strong>. Opening registration...`, 'success');
     setTimeout(() => {
-      window.location.href = result.registrationUrl;
-    }, 1200);
+      document.getElementById('consentStep')?.classList.add('hidden');
+      revealParticipantForm();
+      showEditNotice();
+      document.getElementById('collectorName')?.focus();
+    }, 700);
   } catch (err) {
     setConsentStatus(`Consent failed: ${err.message}`, 'error');
   } finally {
@@ -1116,10 +1111,7 @@ async function postSubmission(formData) {
 }
 
 async function apiAction(action, data = {}) {
-  const endpoint = action === 'initConsent'
-    ? (CONFIG.CONSENT_ENDPOINT || CONFIG.REGISTRATION_ENDPOINT)
-    : CONFIG.REGISTRATION_ENDPOINT;
-  const response = await fetch(endpoint, {
+  const response = await fetch(CONFIG.API_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, ...data, syncStatus: data.syncStatus || 'synced' })
@@ -1607,7 +1599,7 @@ async function fetchProtectedSheetData(adminPassword) {
   let result;
 
   try {
-    const response = await fetch(CONFIG.REGISTRATION_ENDPOINT, {
+    const response = await fetch(CONFIG.API_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
@@ -1634,7 +1626,7 @@ async function fetchProtectedSheetData(adminPassword) {
 function fetchProtectedSheetDataJsonp(adminPassword) {
   return new Promise((resolve, reject) => {
     const callbackName = `happySheetData_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const url = new URL(CONFIG.REGISTRATION_ENDPOINT);
+    const url = new URL(CONFIG.API_ENDPOINT);
     url.searchParams.set('action', 'getSheetData');
     url.searchParams.set('adminPassword', adminPassword);
     url.searchParams.set('callback', callbackName);

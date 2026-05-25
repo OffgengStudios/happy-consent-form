@@ -81,8 +81,6 @@ const JOB_PLACEMENT_FIELDS = [
 ];
 
 function doPost(e) {
-  const lock = LockService.getScriptLock();
-  lock.tryLock(20000);
   try {
     const payload = parsePayload(e);
     const action = payload.action || 'saveParticipantInfo';
@@ -103,8 +101,6 @@ function doPost(e) {
     throw new Error(`Unsupported action: ${action}`);
   } catch (err) {
     return jsonResponse({ status: 'ERROR', message: err.message });
-  } finally {
-    lock.releaseLock();
   }
 }
 
