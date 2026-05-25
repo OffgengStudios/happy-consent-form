@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#5B45E8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Happy Kollect - HAPPY Program Registration</title>
+<script src="js/tailwind.min.js"></script>
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="pb-16">
+
+<!-- NAVIGATION -->
+<nav class="navbar">
+  <div class="nav-brand">
+    <div class="nav-logo">HK</div>
+    <div class="nav-title">
+      Happy Kollect
+      <small>HAPPY PROGRAM &bull; FIELD REGISTRATION</small>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="setView('form')" id="tab-form">&#x1F4DD; Entry</button>
+    <button class="nav-tab" onclick="showAdminLogin()" id="tab-sheet">&#x1F4CA; Master</button>
+  </div>
+</nav>
+
+<!-- STATUS BAR -->
+<div id="statusBar" class="status-bar hidden mx-4 mt-4">
+  <span id="statusText"></span>
+</div>
+
+<!-- MAIN CONTAINER -->
+<div class="max-w-7xl mx-auto px-4 mt-4">
+
+  <!-- FORM VIEW -->
+  <div id="view-form">
+    <form id="mainForm" onsubmit="handleSubmit(event)">
+
+      <!-- SECTION A: SUBMISSION META -->
+      <div class="form-section">
+        <div class="section-header">
+          <h2 class="section-title"><span class="section-badge">A</span> Submission Information</h2>
+          <span id="subIdDisplay" class="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">SUB-AUTO</span>
+        </div>
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label">Submission ID <span class="auto-badge">Auto</span></label>
+            <input type="text" id="submissionId" class="field-input readonly" readonly>
+          </div>
+          <div class="field-group">
+            <label class="field-label required">Collector Name</label>
+            <input type="text" id="collectorName" class="field-input" required placeholder="Your name">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Device ID <span class="auto-badge">Auto</span></label>
+            <input type="text" id="deviceId" class="field-input readonly" readonly>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Timestamp <span class="auto-badge">Auto</span></label>
+            <input type="text" id="submissionTimestamp" class="field-input readonly" readonly>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION B: PARTICIPANT INFORMATION -->
+      <div class="form-section" style="border-top-color: #3b82f6;">
+        <h2 class="section-title"><span class="section-badge" style="background:#3b82f6">B</span> Participant Information</h2>
+
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label">Participant ID <span class="auto-badge">Auto</span></label>
+            <input type="text" id="participantId" class="field-input readonly" readonly placeholder="Will auto-generate">
+          </div>
+          <div class="field-group">
+            <label class="field-label">HAMIS ID <span class="auto-badge">Auto</span></label>
+            <input type="text" id="hamisId" class="field-input readonly" readonly placeholder="Will auto-generate">
+          </div>
+          <div class="field-group">
+            <label class="field-label required">Onboarding Date</label>
+            <input type="date" id="onboardingDate" class="field-input" required>
+          </div>
+          <div class="field-group">
+            <label class="field-label required">Implementing Partner</label>
+            <select id="implementingPartner" class="field-input" required onchange="onPartnerChange()">
+              <option value="">Select Partner</option>
+              <option value="Jobberman">Jobberman</option>
+              <option value="Agrico">Agrico</option>
+              <option value="YouthEmpower">YouthEmpower</option>
+              <option value="SkillsGH">SkillsGH</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Location -->
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label required">Region</label>
+            <select id="region" class="field-input" required onchange="populateDistricts('region','district'); updateIds();">
+              <option value="">Select Region</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label required">District</label>
+            <select id="district" class="field-input" required disabled>
+              <option value="">Select District</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Community</label>
+            <input type="text" id="community" class="field-input" placeholder="Town/Community">
+          </div>
+          <div class="field-group">
+            <label class="field-label required">Location Status</label>
+            <select id="locationStatus" class="field-input" required>
+              <option value="">Select</option>
+              <option value="Urban">Urban</option>
+              <option value="Peri-Urban">Peri-Urban</option>
+              <option value="Rural">Rural</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Personal Details -->
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label required">Surname</label>
+            <input type="text" id="surname" class="field-input" required>
+          </div>
+          <div class="field-group">
+            <label class="field-label required">First Name</label>
+            <input type="text" id="firstName" class="field-input" required>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Other Name(s)</label>
+            <input type="text" id="otherNames" class="field-input">
+          </div>
+          <div class="field-group">
+            <label class="field-label required">Sex</label>
+            <select id="sex" class="field-input" required>
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label required">Date of Birth</label>
+            <input type="date" id="dob" class="field-input" required onchange="calculateAge()">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Age <span class="auto-badge">Calc</span></label>
+            <input type="text" id="age" class="field-input readonly" readonly>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Age Group <span class="auto-badge">Auto</span></label>
+            <input type="text" id="participantTypeAge" class="field-input readonly" readonly>
+          </div>
+          <div class="field-group">
+            <label class="field-label required">Telephone</label>
+            <input type="tel" id="telephone" class="field-input" required placeholder="0244111111" onblur="validatePhone(this)">
+          </div>
+        </div>
+
+        <!-- ID & Special Status -->
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label">ID Type</label>
+            <select id="idType" class="field-input" onchange="handleIdTypeChange()">
+              <option value="">Select</option>
+              <option value="Ghana Card">Ghana Card</option>
+              <option value="Voter's ID">Voter's ID</option>
+              <option value="Passport">Passport</option>
+              <option value="National ID">National ID</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Ghana Card ID</label>
+            <input type="text" id="ghanaCardId" class="field-input" placeholder="GHA-XXXXXXXXX-X" oninput="formatGhanaCard(this)">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Voter's ID</label>
+            <input type="text" id="voterId" class="field-input" placeholder="10 characters">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Refugee Status</label>
+            <select id="refugeeStatus" class="field-input" onchange="toggleRefugeeField()">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+        </div>
+        <div id="nationalityField" class="field-group hidden">
+          <label class="field-label">Nationality (if Refugee)</label>
+          <input type="text" id="nationality" class="field-input">
+        </div>
+
+        <!-- Displacement -->
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label">Displacement Status</label>
+            <select id="displacementStatus" class="field-input" onchange="toggleDisplacementFields()">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div id="displacementReasonField" class="field-group hidden">
+            <label class="field-label">Reason for Displacement</label>
+            <select id="displacementReason" class="field-input">
+              <option value="">Select</option>
+              <option value="War/Conflict">War/Conflict</option>
+              <option value="Flood">Flood</option>
+              <option value="Fire">Fire</option>
+              <option value="Natural Disaster">Other Natural Disasters</option>
+              <option value="Non-Natural">Other Non-Natural Disasters</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div id="originalCommunityField" class="field-group hidden">
+            <label class="field-label">Original Community</label>
+            <input type="text" id="originalCommunity" class="field-input">
+          </div>
+          <div id="hostCommunityField" class="field-group hidden">
+            <label class="field-label">Host Community (Current)</label>
+            <input type="text" id="hostCommunity" class="field-input">
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label">Disability Status</label>
+            <select id="disabilityStatus" class="field-input" onchange="toggleDisabilityField()">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div id="disabilitySpecField" class="field-group hidden">
+            <label class="field-label">Specify Disability</label>
+            <select id="disabilitySpecify" class="field-input">
+              <option value="">Select</option>
+              <option value="Hearing">Hearing</option>
+              <option value="Visual">Visual</option>
+              <option value="Speech">Speech</option>
+              <option value="Mobility">Mobility</option>
+              <option value="Albinism">Albinism</option>
+              <option value="Deaf-Blindness">Deaf-Blindness</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Education & Employment -->
+        <div class="field-grid">
+          <div class="field-group">
+            <label class="field-label required">Education Level</label>
+            <select id="educationLevel" class="field-input" required>
+              <option value="">Select</option>
+              <option value="None">None</option>
+              <option value="Primary">Primary</option>
+              <option value="JHS">JHS</option>
+              <option value="SHS">SHS</option>
+              <option value="Vocational">Vocational</option>
+              <option value="Technical">Technical</option>
+              <option value="College">College</option>
+              <option value="University">University</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label required">Employment Status</label>
+            <select id="employmentStatus" class="field-input" required onchange="toggleBaselineEmploymentFields()">
+              <option value="">Select</option>
+              <option value="Employed">Employed</option>
+              <option value="Unemployed">Unemployed</option>
+              <option value="Casual Worker">Casual Worker</option>
+              <option value="Student">Student</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="baselineEmploymentFields" class="conditional-box">
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label">Current Occupation</label>
+              <input type="text" id="currentOccupation" class="field-input" placeholder="e.g., Farmer, Trader">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Income (GHS)</label>
+              <select id="monthlyIncome" class="field-input">
+                <option value="">Select</option>
+                <option value="None">None</option>
+                <option value="1-200">1-200</option>
+                <option value="201-500">201-500</option>
+                <option value="501-700">501-700</option>
+                <option value="701-1000">701-1000</option>
+                <option value="1001-1200">1001-1200</option>
+                <option value="1201-1500">1201-1500</option>
+                <option value="1501-1700">1501-1700</option>
+                <option value="1701-2000">1701-2000</option>
+                <option value="Above 2000">Above 2000</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Income Frequency</label>
+              <select id="incomeFrequency" class="field-input">
+                <option value="">Select</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label">Sector</label>
+              <select id="sector" class="field-input" onchange="populateIndustries()">
+                <option value="">Select</option>
+                <option value="Agriculture">Agriculture</option>
+                <option value="Non-Agriculture">Non-Agriculture</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Industry</label>
+              <select id="industry" class="field-input" disabled onchange="populateJobTypes()">
+                <option value="">Select</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Job Type</label>
+              <select id="jobType" class="field-input" disabled onchange="populateJobRoles()">
+                <option value="">Select</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Job Role</label>
+              <select id="jobRole" class="field-input" disabled>
+                <option value="">Select</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label">Work Region</label>
+              <select id="workRegion" class="field-input" onchange="populateDistricts('workRegion','workDistrict')">
+                <option value="">Select Region</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Work District</label>
+              <select id="workDistrict" class="field-input" disabled>
+                <option value="">Select District</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Work Community/Town</label>
+              <input type="text" id="workCommunity" class="field-input">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION C: CAPACITY BUILDING -->
+      <div class="form-section purple">
+        <h2 class="section-title"><span class="section-badge purple">C</span> Capacity Building</h2>
+        <div class="conditional-trigger purple">
+          <label class="field-label required">Have you been trained by <span id="partnerNameDisplay">the implementing partner</span>?</label>
+          <div class="flex gap-4 mt-1">
+            <label class="text-xs font-bold"><input type="radio" name="tr_check" value="Yes" onclick="toggleCapacityFields(true)"> YES</label>
+            <label class="text-xs font-bold"><input type="radio" name="tr_check" value="No" onclick="toggleCapacityFields(false)" checked> NO</label>
+          </div>
+        </div>
+        <div id="capacityFields" class="conditional-box">
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label required">Training Start Date</label>
+              <input type="date" id="trainingStartDate" class="field-input">
+            </div>
+            <div class="field-group">
+              <label class="field-label required">Training End Date</label>
+              <input type="date" id="trainingEndDate" class="field-input">
+            </div>
+            <div class="field-group">
+              <label class="field-label required">Training Location</label>
+              <input type="text" id="trainingLocation" class="field-input" placeholder="Venue/Location">
+            </div>
+            <div class="field-group">
+              <label class="field-label required">Mode of Training</label>
+              <select id="trainingMode" class="field-input" required onchange="toggleTrainingModeFields()">
+                <option value="">Select</option>
+                <option value="In-person">In-person</option>
+                <option value="Virtual">Virtual</option>
+                <option value="Hybrid">Hybrid</option>
+              </select>
+            </div>
+          </div>
+          <div id="virtualTrainingFields" class="field-group hidden" style="background:#f0f9ff;padding:0.75rem;border-radius:0.5rem;margin:0.5rem 0;border-left:3px solid #7c3aed">
+            <label class="field-label" style="font-weight:700;color:#7c3aed">Virtual Training Details</label>
+            <div class="field-group" style="margin-top:0.5rem">
+              <label class="field-label">Virtual Platform Used</label>
+              <select id="virtualPlatform" class="field-input">
+                <option value="">Select</option>
+                <option value="Google Meet">Google Meet</option>
+                <option value="Microsoft Teams">Teams</option>
+                <option value="Zoom">Zoom</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label">Trainer Type</label>
+              <select id="trainerType" class="field-input">
+                <option value="">Select</option>
+                <option value="Internal">Internal</option>
+                <option value="External">External</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Training Partner</label>
+              <select id="trainingPartner" class="field-input">
+                <option value="">Select</option>
+                <option value="Jobberman">Jobberman</option>
+                <option value="Agrico">Agrico</option>
+                <option value="TVET Authority">TVET Authority</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Completion Status</label>
+              <select id="completionStatus" class="field-input">
+                <option value="">Select</option>
+                <option value="Completed">Completed</option>
+                <option value="Dropped">Dropped</option>
+                <option value="Ongoing">Ongoing</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Certificate Issued</label>
+              <select id="certificateIssued" class="field-input">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Training Modules Completed (Select all that apply)</label>
+            <div class="checkbox-grid">
+              <label class="checkbox-label"><input type="checkbox" name="modules" value="Soft Skills"> Soft Skills</label>
+              <label class="checkbox-label"><input type="checkbox" name="modules" value="Employability"> Employability/Career Essential Skills</label>
+              <label class="checkbox-label"><input type="checkbox" name="modules" value="Entrepreneurship"> Small Business &amp; Entrepreneurship</label>
+              <label class="checkbox-label"><input type="checkbox" name="modules" value="Digital Literacy"> Digital Literacy/ICT Skills</label>
+              <label class="checkbox-label"><input type="checkbox" name="modules" value="Financial Management"> Financial Management</label>
+              <label class="checkbox-label"><input type="checkbox" name="modules" value="Agri-Business"> Agri-Business</label>
+              <label class="checkbox-label"><input type="checkbox" name="modules" value="Vocational Training"> Vocational Training</label>
+              <label class="checkbox-label"><input type="checkbox" name="modules" value="Other"> Other</label>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">What Digital Literacy/ICT Skills training did you have?</label>
+            <div class="checkbox-grid">
+              <label class="checkbox-label"><input type="checkbox" name="digitalSkills" value="Graphic Design"> Graphic Design</label>
+              <label class="checkbox-label"><input type="checkbox" name="digitalSkills" value="Web Development"> Web Development</label>
+              <label class="checkbox-label"><input type="checkbox" name="digitalSkills" value="Data Entry"> Data Entry</label>
+              <label class="checkbox-label"><input type="checkbox" name="digitalSkills" value="Social Media"> Social Media Management</label>
+              <label class="checkbox-label"><input type="checkbox" name="digitalSkills" value="Other"> Other</label>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">What else would you like to be trained in?</label>
+            <textarea id="wishTraining" class="field-input textarea" placeholder="Describe desired training"></textarea>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Have you had any other training before this?</label>
+            <select id="previousTrainings" class="field-input" onchange="togglePreviousTrainingDetails()">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div id="previousTrainingDetails" class="field-group hidden">
+            <label class="field-label">Please describe previous training(s)</label>
+            <textarea id="previousTrainingDesc" class="field-input textarea" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION D: JOB PLACEMENT -->
+      <div class="form-section green">
+        <h2 class="section-title"><span class="section-badge green">D</span> Job Placement</h2>
+        <div class="conditional-trigger green">
+          <label class="field-label required">Were you placed by <span id="partnerNameDisplay2">the implementing partner</span>?</label>
+          <div class="flex gap-4 mt-1">
+            <label class="text-xs font-bold"><input type="radio" name="pl_check" value="Yes" onclick="togglePlacementFields(true)"> YES</label>
+            <label class="text-xs font-bold"><input type="radio" name="pl_check" value="No" onclick="togglePlacementFields(false)" checked> NO</label>
+          </div>
+        </div>
+        <div id="placementFields" class="conditional-box">
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label required">Placement Start Date</label>
+              <input type="date" id="placementStartDate" class="field-input">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Placement Region</label>
+              <select id="placementRegion" class="field-input" onchange="populateDistricts('placementRegion','placementDistrict')">
+                <option value="">Select Region</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Placement District</label>
+              <select id="placementDistrict" class="field-input" disabled>
+                <option value="">Select District</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Placement Community</label>
+              <input type="text" id="placementCommunity" class="field-input">
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label required">Sector</label>
+              <select id="plSector" class="field-input" required onchange="populatePlacementIndustries()">
+                <option value="">Select</option>
+                <option value="Agriculture">Agriculture</option>
+                <option value="Non-Agriculture">Non-Agriculture</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label required">Industry</label>
+              <select id="plIndustry" class="field-input" required disabled onchange="populatePlacementJobTypes()">
+                <option value="">Select</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label required">Job Type</label>
+              <select id="plJobType" class="field-input" required disabled onchange="populatePlacementJobRoles()">
+                <option value="">Select</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label required">Job Role</label>
+              <select id="plJobRole" class="field-input" required disabled>
+                <option value="">Select</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label required">Employment Type</label>
+              <select id="employmentType" class="field-input" required>
+                <option value="">Select</option>
+                <option value="Wage">Wage Employment</option>
+                <option value="Self-Employment">Self-Employment</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label required">Employment Category</label>
+              <select id="employmentCategory" class="field-input" required>
+                <option value="">Select</option>
+                <option value="New">New Employment</option>
+                <option value="Improved">Improved Employment</option>
+                <option value="Additional">Additional Employment</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label required">Income (GHS)</label>
+              <select id="placementIncome" class="field-input" required>
+                <option value="">Select</option>
+                <option value="None">None</option>
+                <option value="1-200">1-200</option>
+                <option value="201-500">201-500</option>
+                <option value="501-700">501-700</option>
+                <option value="701-1000">701-1000</option>
+                <option value="1001-1200">1001-1200</option>
+                <option value="1201-1500">1201-1500</option>
+                <option value="1501-1700">1501-1700</option>
+                <option value="1701-2000">1701-2000</option>
+                <option value="Above 2000">Above 2000</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Income Frequency</label>
+              <select id="placementIncomeFreq" class="field-input">
+                <option value="">Select</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field-group">
+              <label class="field-label">Employer Name</label>
+              <input type="text" id="employerName" class="field-input">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Contract Type</label>
+              <select id="contractType" class="field-input">
+                <option value="">Select</option>
+                <option value="Permanent">Permanent</option>
+                <option value="Fixed-term">Fixed-term</option>
+                <option value="Casual">Casual</option>
+                <option value="Contract">Contract</option>
+                <option value="Internship">Internship</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Work Hours/Week</label>
+              <input type="number" id="workHours" class="field-input" min="1" max="168" placeholder="e.g., 40">
+            </div>
+          </div>
+        </div>
+
+        <!-- Current Employment (if NOT placed) -->
+        <div id="currentEmploymentFields" class="conditional-box">
+          <div class="field-group">
+            <label class="field-label">Are you currently employed elsewhere?</label>
+            <select id="currentlyEmployed" class="field-input" onchange="toggleCurrentEmploymentDetails()">
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+          <div id="currentEmploymentDetails" class="hidden">
+            <div class="field-grid">
+              <div class="field-group">
+                <label class="field-label">Current Employer</label>
+                <input type="text" id="currentEmployer" class="field-input">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Current Job Role</label>
+                <input type="text" id="currentJobRoleAlt" class="field-input">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Current Income (GHS)</label>
+                <select id="currentIncomeAlt" class="field-input">
+                  <option value="">Select</option>
+                  <option value="None">None</option>
+                  <option value="1-200">1-200</option>
+                  <option value="201-500">201-500</option>
+                  <option value="501-1000">501-1000</option>
+                  <option value="1001+">1001+</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit Buttons -->
+      <div class="btn-group">
+        <button type="submit" id="submitBtn" class="btn-primary">Submit Registration</button>
+        <button type="button" class="btn-secondary" onclick="resetForm()">Reset</button>
+      </div>
+    </form>
+
+    <!-- Success Screen -->
+    <div id="successScreen" class="success-screen">
+      <div class="success-icon">&#10003;</div>
+      <h3 class="success-title">Submission Successful!</h3>
+      <p>Your response has been saved to Google Sheets.</p>
+      <p class="success-ref">Reference: <span id="refDisplay"></span></p>
+      <button class="btn-primary" onclick="resetForm()">Submit Another</button>
+    </div>
+  </div>
+
+  <!-- MASTER SHEET VIEW -->
+  <div id="view-sheet" class="hidden">
+    <div class="bg-white p-4 rounded-lg shadow border mb-4">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="font-black text-blue-800 uppercase text-xs tracking-widest">Master Data Repository</h2>
+        <div class="flex gap-2">
+          <button onclick="loadSheetData()" class="bg-blue-600 text-white text-[10px] px-3 py-1 rounded font-bold">Refresh</button>
+          <button onclick="exportSheetData()" class="bg-emerald-600 text-white text-[10px] px-3 py-1 rounded font-bold">Export CSV</button>
+        </div>
+      </div>
+      <div class="sheet-container">
+        <table class="sheet-table" id="masterSheet">
+          <thead id="sheetHead"></thead>
+          <tbody id="sheetBody"><tr><td colspan="25" style="text-align:center;padding:1.5rem;color:#64748b">Click "Refresh" to load data from Google Sheets</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <p>Powered by HAPPY Program &bull; Happy Kollect v1.0</p>
+  <p>Developed by: <strong>Murphy Richards</strong> - MERL Manager</p>
+</footer>
+
+<!-- Admin Login Modal -->
+<div id="adminModal" class="admin-modal hidden">
+  <div class="admin-box">
+    <h3>&#x1F510; Admin Access</h3>
+    <p class="text-xs text-slate-600 mb-2">Enter password to view Master Sheet</p>
+    <input type="password" id="adminPassword" placeholder="Enter admin password" onkeydown="if(event.key==='Enter') verifyAdmin()">
+    <div class="btn-group">
+      <button onclick="verifyAdmin()" class="btn-primary" style="padding:0.625rem">Unlock</button>
+      <button onclick="closeAdminLogin()" class="btn-secondary" style="padding:0.625rem">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast hidden">
+  <span id="toastMessage"></span>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
