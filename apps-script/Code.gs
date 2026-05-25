@@ -9,6 +9,7 @@ const CONSENT_SIGNATURE_FOLDER_ID = '1uczj5UbNUqY0-j6Rn7bosXO13LvvACmV';
 const CV_UPLOAD_FOLDER_ID = '1WEqqBy9AvnzMAkd6dJBXeaO_IqnO1bSc';
 const REGISTRATION_SPREADSHEET_ID = '15wqqAiJIbw6lfzwZFG_fGiklG-jFMCCpQhkaWVtPSzA';
 const REGISTRATION_SHEET_GID = 120260501;
+const REGISTRATION_SHEET_EXPORT_HEADERS = ['participantId', 'participantInfoStatus', 'lastUpdatedAt'].concat(REGISTRATION_HEADERS);
 const BACKEND_VERSION = '2026-05-21-consent-signature-folder';
 
 const LIFECYCLE_HEADERS = [
@@ -215,7 +216,6 @@ function initConsent(payload) {
 
   const consentLogId = generateConsentId();
   appendToConsentLog(payload, signatureFile, consentLogId);
-  appendToRegistrationSheet(payload, signatureFile, consentLogId);
 
   appendAudit({
     participantId,
@@ -348,6 +348,8 @@ function saveParticipantInfo(payload, explicitSection) {
   } else {
     updateRow(sheet, headers, rowIndex, record);
   }
+
+  appendRegistrationData(record);
 
   appendAudit({
     participantId,
@@ -790,30 +792,14 @@ function appendToConsentLog(payload, signatureFile, consentId) {
   }
 }
 
-function appendToRegistrationSheet(payload, signatureFile, consentId) {
+function appendRegistrationData(record) {
   try {
     const ss = SpreadsheetApp.openById(REGISTRATION_SPREADSHEET_ID);
     const sheet = ss.getSheets().find(s => s.getSheetId() === REGISTRATION_SHEET_GID) || ss.getSheets()[0];
-    ensureHeaders(sheet, CONSENT_LOG_HEADERS);
-    const newRow = sheet.getLastRow() + 1;
-    sheet.appendRow([
-      consentId,
-      payload.timestamp || new Date().toISOString(),
-      payload.venue || '',
-      payload.name || '',
-      payload.phone || '',
-      payload.email || '',
-      'Yes',
-      payload.language || 'en',
-      'HAPPY Program',
-      ''
-    ]);
-    if (signatureFile && signatureFile.url) {
-      sheet.getRange(newRow, CONSENT_LOG_HEADERS.length)
-        .setFormula('=HYPERLINK("' + signatureFile.url.replace(/"/g, '') + '","View")');
-    }
+    const headers = ensureHeaders(sheet, REGISTRATION_SHEET_EXPORT_HEADERS);
+    sheet.appendRow(headers.map(h => toSheetValue(record[h] || '')));
   } catch (err) {
-    appendAuditSafe({ action: 'appendToRegistrationSheetFailed', section: 'consent', notes: err.message });
+    appendAuditSafe({ action: 'appendRegistrationDataFailed', section: 'registration', notes: err.message });
   }
 }
 
