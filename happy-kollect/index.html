@@ -36,12 +36,46 @@
 <!-- MAIN CONTAINER -->
 <div class="max-w-7xl mx-auto px-4 mt-4">
 
+  <!-- LOCKED SCREEN -->
+  <div id="lockedScreen" class="hidden" style="text-align:center;padding:3rem 1rem;">
+    <div style="font-size:3rem;">&#x1F512;</div>
+    <h2 style="font-weight:900;font-size:1.25rem;margin:1rem 0 0.5rem;">Access Required</h2>
+    <p style="color:#64748b;font-size:0.875rem;margin-bottom:1.5rem;">This page requires a valid consent link or admin access to continue.</p>
+    <p style="color:#94a3b8;font-size:0.75rem;">If you were sent a link, please use that link to access this form.</p>
+  </div>
+
+  <!-- CAPACITY ENTRY SCREEN -->
+  <div id="capacityEntryScreen" class="hidden" style="max-width:480px;margin:2rem auto;background:#fff;border-radius:1rem;box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:2rem;">
+    <h2 style="font-weight:900;font-size:1.1rem;margin-bottom:0.25rem;">Capacity Building Registration</h2>
+    <p style="color:#64748b;font-size:0.8rem;margin-bottom:1.5rem;">Do you have a Participant ID from a previous registration?</p>
+    <div style="display:flex;gap:1rem;margin-bottom:1.5rem;">
+      <button type="button" onclick="selectCapacityMode('existing')" id="btnHasId"
+        style="flex:1;padding:0.75rem;border-radius:0.5rem;border:2px solid #e2e8f0;font-weight:700;font-size:0.85rem;cursor:pointer;background:#fff;">
+        Yes, I have an ID
+      </button>
+      <button type="button" onclick="selectCapacityMode('new')" id="btnNoId"
+        style="flex:1;padding:0.75rem;border-radius:0.5rem;border:2px solid #e2e8f0;font-weight:700;font-size:0.85rem;cursor:pointer;background:#fff;">
+        No, I am new
+      </button>
+    </div>
+    <div id="participantIdLookup" class="hidden">
+      <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.4rem;">Enter your Participant ID</label>
+      <input type="text" id="lookupParticipantId" placeholder="e.g. HAPPY-2026-000001"
+        style="width:100%;padding:0.6rem 0.75rem;border:1.5px solid #cbd5e1;border-radius:0.5rem;font-size:0.85rem;box-sizing:border-box;margin-bottom:0.75rem;">
+      <button type="button" onclick="lookupAndContinue()"
+        style="width:100%;padding:0.7rem;background:#5B45E8;color:#fff;border:none;border-radius:0.5rem;font-weight:700;font-size:0.85rem;cursor:pointer;">
+        Continue
+      </button>
+      <p id="lookupError" class="hidden" style="color:#ef4444;font-size:0.75rem;margin-top:0.5rem;"></p>
+    </div>
+  </div>
+
   <!-- FORM VIEW -->
   <div id="view-form">
     <form id="mainForm" onsubmit="handleSubmit(event)">
 
       <!-- SECTION A: SUBMISSION META -->
-      <div class="form-section">
+      <div id="sectionA" class="form-section">
         <div class="section-header">
           <h2 class="section-title"><span class="section-badge">A</span> Submission Information</h2>
           <span id="subIdDisplay" class="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">SUB-AUTO</span>
@@ -67,7 +101,7 @@
       </div>
 
       <!-- SECTION B: PARTICIPANT INFORMATION -->
-      <div class="form-section" style="border-top-color: #3b82f6;">
+      <div id="sectionB" class="form-section" style="border-top-color: #3b82f6;">
         <h2 class="section-title"><span class="section-badge" style="background:#3b82f6">B</span> Participant Information</h2>
 
         <div class="field-grid">
@@ -365,7 +399,7 @@
       </div>
 
       <!-- SECTION C: CAPACITY BUILDING -->
-      <div class="form-section purple">
+      <div id="sectionC" class="form-section purple">
         <h2 class="section-title"><span class="section-badge purple">C</span> Capacity Building</h2>
         <div class="conditional-trigger purple">
           <label class="field-label required">Have you been trained by <span id="partnerNameDisplay">the implementing partner</span>?</label>
@@ -491,7 +525,7 @@
       </div>
 
       <!-- SECTION D: JOB PLACEMENT -->
-      <div class="form-section green">
+      <div id="sectionD" class="form-section green">
         <h2 class="section-title"><span class="section-badge green">D</span> Job Placement</h2>
         <div class="conditional-trigger green">
           <label class="field-label required">Were you placed by <span id="partnerNameDisplay2">the implementing partner</span>?</label>

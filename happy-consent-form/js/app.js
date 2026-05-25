@@ -477,13 +477,11 @@ async function handleConsentSubmit(event) {
     if (formState.token) localStorage.setItem('happyContinuationToken', formState.token);
     document.getElementById('participantId').value = result.participantId || '';
     applyConsentToRegistration(payload, result.participantId);
-    setConsentStatus(`Consent saved. Participant ID: <strong>${result.participantId}</strong>. Opening registration...`, 'success');
+    setConsentStatus(`Consent saved. Participant ID: <strong>${result.participantId}</strong>. Redirecting to Phase 2...`, 'success');
     setTimeout(() => {
-      document.getElementById('consentStep')?.classList.add('hidden');
-      revealParticipantForm();
-      showEditNotice();
-      document.getElementById('collectorName')?.focus();
-    }, 700);
+      const kollectUrl = result.registrationUrl || `https://murphy-richard.github.io/happy-kollekt/?token=${encodeURIComponent(result.token)}`;
+      window.location.href = kollectUrl;
+    }, 1500);
   } catch (err) {
     setConsentStatus(`Consent failed: ${err.message}`, 'error');
   } finally {

@@ -65,6 +65,42 @@ const CONSENT_LOG_HEADERS = [
   'Phone Number', 'Email', 'Accept to Participate', 'Language', 'Program', 'Signature'
 ];
 
+const SUBMISSION_METADATA_SHEET_NAME = 'SUBMISSION METADATA';
+const SUBMISSION_METADATA_HEADERS = [
+  'SUBMISSION ID', 'COLLECTOR NAME', 'DEVICE ID', 'SUBMISSION TIMESTAMP'
+];
+
+const JOB_PLACEMENT_SHEET_NAME = 'Job Placement';
+const JOB_PLACEMENT_SHEET_HEADERS = [
+  'PARTICIPANT ID', 'SUBMISSION ID',
+  'PLACED BY PARTNER', 'PLACEMENT START DATE', 'PLACEMENT REGION', 'PLACEMENT DISTRICT',
+  'PLACEMENT COMMUNITY', 'SECTOR', 'INDUSTRY', 'JOB TYPE', 'JOB ROLE',
+  'EMPLOYMENT TYPE', 'EMPLOYMENT CATEGORY', 'PLACEMENT INCOME', 'PLACEMENT INCOME FREQ',
+  'EMPLOYER NAME', 'CONTRACT TYPE', 'WORK HOURS', 'CURRENTLY EMPLOYED',
+  'CURRENT EMPLOYER', 'CURRENT JOB ROLE', 'CURRENT INCOME'
+];
+
+const CAPACITY_BUILDING_SHEET_NAME = 'Capacity Building';
+const CAPACITY_BUILDING_HEADERS = [
+  'PARTICIPANT ID', 'SUBMISSION ID',
+  'TRAINING START DATE', 'TRAINING END DATE', 'TRAINING LOCATION', 'TRAINING MODE',
+  'VIRTUAL PLATFORM', 'TRAINER TYPE', 'TRAINING PARTNER', 'COMPLETION STATUS',
+  'CERTIFICATE ISSUED', 'MODULES', 'DIGITAL SKILLS', 'WISH TRAINING',
+  'PREVIOUS TRAININGS', 'PREVIOUS TRAINING DESC'
+];
+
+const PARTICIPANT_INFO_SHEET_NAME = 'Participant Information';
+const PARTICIPANT_INFO_HEADERS = [
+  'PARTICIPANT ID', 'HAMIS ID', 'ONBOARDING DATE', 'IMPLEMENTING PARTNER',
+  'REGION', 'DISTRICT', 'COMMUNITY', 'LOCATION STATUS', 'SURNAME', 'FIRST NAME',
+  'OTHER NAMES', 'SEX', 'DOB', 'AGE', 'PARTICIPANT TYPE AGE', 'TELEPHONE',
+  'ID TYPE', 'GHANA CARD ID', 'VOTER ID', 'REFUGEE STATUS', 'NATIONALITY',
+  'DISPLACEMENT STATUS', 'DISPLACEMENT REASON', 'ORIGINAL COMMUNITY',
+  'HOST COMMUNITY', 'DISABILITY STATUS', 'DISABILITY SPECIFY', 'EDUCATION LEVEL',
+  'EMPLOYMENT STATUS', 'CURRENT OCCUPATION', 'MONTHLY INCOME', 'INCOME FREQUENCY',
+  'SECTOR', 'INDUSTRY', 'JOB TYPE', 'JOB ROLE', 'WORK REGION', 'WORK DISTRICT'
+];
+
 const CAPACITY_BUILDING_FIELDS = [
   'trainedByPartner', 'trainingStartDate', 'trainingEndDate', 'trainingLocation',
   'trainingMode', 'virtualPlatform', 'trainerType', 'trainingPartner',
@@ -349,7 +385,7 @@ function saveParticipantInfo(payload, explicitSection) {
     updateRow(sheet, headers, rowIndex, record);
   }
 
-  appendRegistrationData(record);
+  if (payload.source === 'kollect') appendRegistrationData(record, explicitSection);
 
   appendAudit({
     participantId,
@@ -792,15 +828,131 @@ function appendToConsentLog(payload, signatureFile, consentId) {
   }
 }
 
-function appendRegistrationData(record) {
+function appendRegistrationData(record, section) {
   try {
-    const ss = SpreadsheetApp.openById(REGISTRATION_SPREADSHEET_ID);
-    const sheet = ss.getSheets().find(s => s.getSheetId() === REGISTRATION_SHEET_GID) || ss.getSheets()[0];
-    const headers = ensureHeaders(sheet, REGISTRATION_SHEET_EXPORT_HEADERS);
-    sheet.appendRow(headers.map(h => toSheetValue(record[h] || '')));
+    appendSubmissionMetadata(record);
+    if (!section || section === 'participant') appendParticipantInfo(record);
+    if (section === 'capacity') appendCapacityBuilding(record);
+    if (section === 'placement') appendJobPlacement(record);
   } catch (err) {
     appendAuditSafe({ action: 'appendRegistrationDataFailed', section: 'registration', notes: err.message });
   }
+}
+
+function getRegistrationSpreadsheet() {
+  return SpreadsheetApp.openById(REGISTRATION_SPREADSHEET_ID);
+}
+
+function getOrCreateRegistrationSheet(name, headers) {
+  const ss = getRegistrationSpreadsheet();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) sheet = ss.insertSheet(name);
+  ensureHeaders(sheet, headers);
+  return sheet;
+}
+
+function appendSubmissionMetadata(record) {
+  const sheet = getOrCreateRegistrationSheet(SUBMISSION_METADATA_SHEET_NAME, SUBMISSION_METADATA_HEADERS);
+  sheet.appendRow([
+    record.submissionId || '',
+    record.collectorName || '',
+    record.deviceId || '',
+    record.submissionTimestamp || ''
+  ]);
+}
+
+function appendJobPlacement(record) {
+  const sheet = getOrCreateRegistrationSheet(JOB_PLACEMENT_SHEET_NAME, JOB_PLACEMENT_SHEET_HEADERS);
+  sheet.appendRow([
+    record.participantId || '',
+    record.submissionId || '',
+    record.placedByPartner || '',
+    record.placementStartDate || '',
+    record.placementRegion || '',
+    record.placementDistrict || '',
+    record.placementCommunity || '',
+    record.plSector || '',
+    record.plIndustry || '',
+    record.plJobType || '',
+    record.plJobRole || '',
+    record.employmentType || '',
+    record.employmentCategory || '',
+    record.placementIncome || '',
+    record.placementIncomeFreq || '',
+    record.employerName || '',
+    record.contractType || '',
+    record.workHours || '',
+    record.currentlyEmployed || '',
+    record.currentEmployer || '',
+    record.currentJobRoleAlt || '',
+    record.currentIncomeAlt || ''
+  ]);
+}
+
+function appendCapacityBuilding(record) {
+  const sheet = getOrCreateRegistrationSheet(CAPACITY_BUILDING_SHEET_NAME, CAPACITY_BUILDING_HEADERS);
+  sheet.appendRow([
+    record.participantId || '',
+    record.submissionId || '',
+    record.trainingStartDate || '',
+    record.trainingEndDate || '',
+    record.trainingLocation || '',
+    record.trainingMode || '',
+    record.virtualPlatform || '',
+    record.trainerType || '',
+    record.trainingPartner || '',
+    record.completionStatus || '',
+    record.certificateIssued || '',
+    record.modules || '',
+    record.digitalSkills || '',
+    record.wishTraining || '',
+    record.previousTrainings || '',
+    record.previousTrainingDesc || ''
+  ]);
+}
+
+function appendParticipantInfo(record) {
+  const sheet = getOrCreateRegistrationSheet(PARTICIPANT_INFO_SHEET_NAME, PARTICIPANT_INFO_HEADERS);
+  sheet.appendRow([
+    record.participantId || '',
+    record.hamisId || '',
+    record.onboardingDate || '',
+    record.implementingPartner || '',
+    record.region || '',
+    record.district || '',
+    record.community || '',
+    record.locationStatus || '',
+    record.surname || '',
+    record.firstName || '',
+    record.otherNames || '',
+    record.sex || '',
+    record.dob || '',
+    record.age || '',
+    record.participantTypeAge || '',
+    record.telephone || '',
+    record.idType || '',
+    record.ghanaCardId || '',
+    record.voterId || '',
+    record.refugeeStatus || '',
+    record.nationality || '',
+    record.displacementStatus || '',
+    record.displacementReason || '',
+    record.originalCommunity || '',
+    record.hostCommunity || '',
+    record.disabilityStatus || '',
+    record.disabilitySpecify || '',
+    record.educationLevel || '',
+    record.employmentStatus || '',
+    record.currentOccupation || '',
+    record.monthlyIncome || '',
+    record.incomeFrequency || '',
+    record.sector || '',
+    record.industry || '',
+    record.jobType || '',
+    record.jobRole || '',
+    record.workRegion || '',
+    record.workDistrict || ''
+  ]);
 }
 
 function appendAuditSafe(entry) {
@@ -1044,21 +1196,22 @@ function sendConsentParticipantEmail(details) {
 
   try {
     const name = details.name ? ` ${details.name}` : '';
-    const subject = 'Your HAPPY Program Participant ID';
+    const subject = 'Your HAPPY Program Consent Confirmation';
     const body = [
       `Hello${name},`,
       '',
-      'Thank you for completing your consent for the HAPPY Program.',
+      'Thank you for giving your consent to participate in the HAPPY Program.',
       '',
-      'Your Participant ID is:',
-      details.participantId,
+      'Here are your details — please keep them safe:',
       '',
-      'Your Consent ID is:',
-      details.consentSubmissionId,
+      `  Consent ID:     ${details.consentSubmissionId}`,
+      `  Participant ID: ${details.participantId}`,
       '',
-      'Please keep this ID safe. You will use it to continue your registration, update participant information, upload a CV, or continue to capacity building/job placement.',
+      'Click the link below to complete your registration (Phase 2):',
       '',
-      `Continuation link: ${details.registrationUrl}`,
+      `  ${details.registrationUrl}`,
+      '',
+      'If you have any questions, please contact your HAPPY Program field officer.',
       '',
       'Regards,',
       'HAPPY Program Team'
@@ -1078,7 +1231,7 @@ function sendConsentParticipantEmail(details) {
 
 function buildRegistrationUrl(token, fallbackBase) {
   const configured = PropertiesService.getScriptProperties().getProperty('REGISTRATION_URL');
-  const base = configured || fallbackBase || '../happy-kollekt/index.html';
+  const base = configured || fallbackBase || 'https://murphy-richard.github.io/happy-kollekt/';
   return `${base}${base.indexOf('?') >= 0 ? '&' : '?'}token=${encodeURIComponent(token)}`;
 }
 
