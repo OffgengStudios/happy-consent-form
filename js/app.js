@@ -1,6 +1,7 @@
 ﻿// ===== CONFIGURATION =====
 const CONFIG = {
-  API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwAnymRCItipYfY66c96mrSRdJE_r2x84J7caU3LmdxRcUgUgmQTOOAe7jdbxm1UgJB/exec',
+  CONSENT_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwOJGkeb5cUERtNF0UVAoljCzZE6wnTSrk4lpzQtDzYXgpyhiZWhdUXph7OdrbAbf9l/exec',
+  REGISTRATION_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwAnymRCItipYfY66c96mrSRdJE_r2x84J7caU3LmdxRcUgUgmQTOOAe7jdbxm1UgJB/exec',
   CV_TEMPLATE_FOLDER_URL: 'https://drive.google.com/drive/folders/1Pybxl_uIF0v-gSewDlSntp5QXpvnfUfO',
   MAX_CV_UPLOAD_BYTES: 5 * 1024 * 1024,
   QUEUE_KEY: 'happy_pending_submissions',
@@ -469,6 +470,7 @@ async function handleConsentSubmit(event) {
       consentGiven: true,
       timestamp: new Date().toISOString(),
       signature: canvas.toDataURL('image/png'),
+      language: navigator.language || 'en',
       appUrl: window.location.href.split('#')[0].split('?')[0]
     };
     const result = await apiAction('initConsent', payload);
@@ -476,13 +478,10 @@ async function handleConsentSubmit(event) {
     if (formState.token) localStorage.setItem('happyContinuationToken', formState.token);
     document.getElementById('participantId').value = result.participantId || '';
     applyConsentToRegistration(payload, result.participantId);
-    setConsentStatus(`Consent saved. Participant ID: <strong>${result.participantId}</strong>. Opening registration...`, 'success');
+    setConsentStatus(`Consent saved. Participant ID: <strong>${result.participantId}</strong>. Redirecting to registration...`, 'success');
     setTimeout(() => {
-      document.getElementById('consentStep')?.classList.add('hidden');
-      revealParticipantForm();
-      showEditNotice();
-      document.getElementById('collectorName')?.focus();
-    }, 700);
+      window.location.href = result.registrationUrl;
+    }, 1200);
   } catch (err) {
     setConsentStatus(`Consent failed: ${err.message}`, 'error');
   } finally {
@@ -1110,7 +1109,10 @@ async function postSubmission(formData) {
 }
 
 async function apiAction(action, data = {}) {
-  const response = await fetch(CONFIG.API_ENDPOINT, {
+  const endpoint = action === 'initConsent'
+    ? (CONFIG.CONSENT_ENDPOINT || CONFIG.REGISTRATION_ENDPOINT)
+    : CONFIG.REGISTRATION_ENDPOINT;
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, ...data, syncStatus: data.syncStatus || 'synced' })
@@ -1598,7 +1600,7 @@ async function fetchProtectedSheetData(adminPassword) {
   let result;
 
   try {
-    const response = await fetch(CONFIG.API_ENDPOINT, {
+    const response = await fetch(CONFIG.REGISTRATION_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
@@ -1625,7 +1627,7 @@ async function fetchProtectedSheetData(adminPassword) {
 function fetchProtectedSheetDataJsonp(adminPassword) {
   return new Promise((resolve, reject) => {
     const callbackName = `happySheetData_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const url = new URL(CONFIG.API_ENDPOINT);
+    const url = new URL(CONFIG.REGISTRATION_ENDPOINT);
     url.searchParams.set('action', 'getSheetData');
     url.searchParams.set('adminPassword', adminPassword);
     url.searchParams.set('callback', callbackName);

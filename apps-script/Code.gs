@@ -7,6 +7,8 @@ const JSON_MIME = ContentService.MimeType.JSON;
 const PARTICIPANT_PREFIX = 'HAPPY-2026-';
 const CONSENT_SIGNATURE_FOLDER_ID = '1uczj5UbNUqY0-j6Rn7bosXO13LvvACmV';
 const CV_UPLOAD_FOLDER_ID = '1WEqqBy9AvnzMAkd6dJBXeaO_IqnO1bSc';
+const REGISTRATION_SPREADSHEET_ID = '15wqqAiJIbw6lfzwZFG_fGiklG-jFMCCpQhkaWVtPSzA';
+const REGISTRATION_SHEET_GID = 120260501;
 const BACKEND_VERSION = '2026-05-21-consent-signature-folder';
 
 const LIFECYCLE_HEADERS = [
@@ -57,6 +59,11 @@ const CV_RESULT_HEADERS = [
   'category', 'subcategory', 'confidence', 'yearsExperience', 'source', 'notes'
 ];
 
+const CONSENT_LOG_HEADERS = [
+  'Consent ID', 'Timestamp', 'Venue of Engagement', 'Participant Name',
+  'Phone Number', 'Email', 'Accept to Participate', 'Language', 'Program', 'Signature'
+];
+
 const CAPACITY_BUILDING_FIELDS = [
   'trainedByPartner', 'trainingStartDate', 'trainingEndDate', 'trainingLocation',
   'trainingMode', 'virtualPlatform', 'trainerType', 'trainingPartner',
@@ -74,6 +81,8 @@ const JOB_PLACEMENT_FIELDS = [
 ];
 
 function doPost(e) {
+  const lock = LockService.getScriptLock();
+  lock.tryLock(20000);
   try {
     const payload = parsePayload(e);
     const action = payload.action || 'saveParticipantInfo';
@@ -89,10 +98,13 @@ function doPost(e) {
     if (action === 'getSheetData') return jsonResponse(getProtectedSheetData(payload.adminPassword, payload.sheetName));
     if (action === 'getReportStats') return jsonResponse(getReportStats());
     if (action === 'refreshDashboard') return jsonResponse(refreshDashboardReport(payload.adminPassword));
+    if (action === 'importFromSheet') return jsonResponse(importFromSheet(payload));
 
     throw new Error(`Unsupported action: ${action}`);
   } catch (err) {
     return jsonResponse({ status: 'ERROR', message: err.message });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -145,10 +157,11 @@ function initConsent(payload) {
   });
 
   let participantId;
+  let signatureFile;
   if (rowIndex > 0) {
     const existing = rowToObject(headers, sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0]);
     participantId = existing.participantId || generateParticipantId(sheet, headers);
-    const signatureFile = saveConsentSignatureToDrive(payload, participantId);
+    signatureFile = saveConsentSignatureToDrive(payload, participantId);
     updateRow(sheet, headers, rowIndex, {
       participantId,
       continuationTokenHash: tokenHash,
@@ -171,7 +184,7 @@ function initConsent(payload) {
     });
   } else {
     participantId = generateParticipantId(sheet, headers);
-    const signatureFile = saveConsentSignatureToDrive(payload, participantId);
+    signatureFile = saveConsentSignatureToDrive(payload, participantId);
     const record = blankRecord(headers);
     Object.assign(record, {
       participantId,
@@ -203,6 +216,10 @@ function initConsent(payload) {
     sheet.appendRow(headers.map(header => toSheetValue(record[header] || '')));
     rowIndex = sheet.getLastRow();
   }
+
+  const consentLogId = generateConsentId();
+  appendToConsentLog(payload, signatureFile, consentLogId);
+  appendToRegistrationSheet(payload, signatureFile, consentLogId);
 
   appendAudit({
     participantId,
@@ -605,11 +622,212 @@ function getProtectedSheetData(password, sheetName) {
   return { status: 'OK', data: getRecords(sheet, headers) };
 }
 
+const SOURCE_TO_MASTER = {
+  'HAMIS ID': 'hamisId',
+  'Onboarding Date': 'onboardingDate',
+  'Organization': 'employerName',
+  'Sector': 'sector',
+  'Sector Type': 'industry',
+  'Job Role': 'jobRole',
+  'Implementing Partner (or Sub-Partner)': 'implementingPartner',
+  'Region': 'region',
+  'District': 'district',
+  'Community': 'community',
+  'Location Status': 'locationStatus',
+  'Participant Type - Support': 'participantTypeSupport',
+  'Surname': 'surname',
+  'First Name': 'firstName',
+  'Other Name(s)': 'otherNames',
+  'Sex': 'sex',
+  'Date of Birth': 'dob',
+  'Age': 'age',
+  'Participant Type - Age': 'participantTypeAge',
+  'Telephone': 'telephone',
+  'Ghana Card ID Number': 'ghanaCardId',
+  "Voter's ID Number": 'voterId',
+  'Refugee Status': 'refugeeStatus',
+  'Nationality (If "Yes" to Refugee)': 'nationality',
+  'Disability Status': 'disabilityStatus',
+  'Specify Disability': 'disabilitySpecify',
+  'Education Level': 'educationLevel',
+  'Employment Status': 'employmentStatus',
+  'Occupation': 'currentOccupation',
+  'Monthly Income': 'monthlyIncome'
+};
+
+function importFromSheet(payload) {
+  const adminPassword = getAdminPassword();
+  if (!adminPassword || payload.adminPassword !== adminPassword) {
+    throw new Error('Admin access required for bulk import.');
+  }
+
+  const sourceId = payload.sourceSpreadsheetId || '1wmEH-iDZVBairol-4COpj1a5dUdHPz7wOfqCCZpWtso';
+  const sourceGid = payload.sourceSheetGid !== undefined ? Number(payload.sourceSheetGid) : 0;
+
+  const sourceSS = SpreadsheetApp.openById(sourceId);
+  const sourceSheet = sourceSS.getSheets().find(s => s.getSheetId() === sourceGid) || sourceSS.getSheets()[0];
+
+  if (sourceSheet.getLastRow() < 2) {
+    return { status: 'OK', imported: 0, skipped: 0, message: 'No data rows found in source sheet.' };
+  }
+
+  const lastCol = sourceSheet.getLastColumn();
+  const sourceHeaders = sourceSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const sourceRows = sourceSheet.getRange(2, 1, sourceSheet.getLastRow() - 1, lastCol).getValues();
+
+  const masterSheet = getMasterSheet();
+  const masterHeaders = ensureHeaders(masterSheet, MASTER_HEADERS);
+  const now = new Date().toISOString();
+
+  let imported = 0;
+  let skipped = 0;
+  const errors = [];
+
+  for (let r = 0; r < sourceRows.length; r++) {
+    const row = sourceRows[r];
+    if (row.every(cell => !String(cell).trim())) continue;
+
+    try {
+      const incoming = {};
+      sourceHeaders.forEach((header, i) => {
+        const masterKey = SOURCE_TO_MASTER[String(header).trim()];
+        if (masterKey) incoming[masterKey] = String(row[i] || '').trim();
+      });
+      if (row[0]) incoming.legacyParticipantId = String(row[0]).trim();
+
+      const phone = normalizePhone(incoming.telephone);
+      const ghanaCard = normalizeGhanaCard(incoming.ghanaCardId);
+      const existingRow = findParticipantRow(masterSheet, masterHeaders, { phone, ghanaCard });
+
+      if (existingRow > 0) { skipped++; continue; }
+
+      const participantId = generateParticipantId(masterSheet, masterHeaders);
+      const record = blankRecord(masterHeaders);
+      Object.assign(record, incoming, {
+        participantId,
+        consentStatus: 'complete',
+        participantInfoStatus: 'submitted',
+        capacityBuildingStatus: 'not_started',
+        jobPlacementStatus: 'not_started',
+        currentStage: 'registration_complete',
+        lockedSections: '',
+        cvStatus: 'not_started',
+        syncStatus: 'synced',
+        participantPhoneNormalized: phone,
+        ghanaCardNormalized: ghanaCard,
+        lastUpdatedAt: now,
+        lastUpdatedBy: payload.actor || 'bulk_import',
+        createdAt: now,
+        createdBy: 'bulk_import'
+      });
+
+      masterSheet.appendRow(masterHeaders.map(h => toSheetValue(record[h] || '')));
+
+      appendAudit({
+        participantId,
+        actorType: 'staff',
+        actor: payload.actor || 'admin',
+        action: 'bulkImport',
+        section: 'registration',
+        source: 'import-tool',
+        notes: 'Legacy ID: ' + (incoming.legacyParticipantId || '')
+      });
+
+      imported++;
+    } catch (err) {
+      errors.push('Row ' + (r + 2) + ': ' + err.message);
+    }
+  }
+
+  return {
+    status: 'OK',
+    imported,
+    skipped,
+    errors,
+    message: 'Imported ' + imported + ' records. Skipped ' + skipped + ' duplicates.' + (errors.length ? ' ' + errors.length + ' errors.' : '')
+  };
+}
+
+function runBulkImport() {
+  const result = importFromSheet({
+    adminPassword: getAdminPassword(),
+    sourceSpreadsheetId: '1wmEH-iDZVBairol-4COpj1a5dUdHPz7wOfqCCZpWtso',
+    sourceSheetGid: 0,
+    actor: 'admin'
+  });
+  Logger.log(JSON.stringify(result));
+  return result;
+}
+
+function generateConsentId() {
+  return 'HAPPY-' + Utilities.getUuid().replace(/-/g, '').slice(0, 8).toUpperCase();
+}
+
+function getConsentLogSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  return ss.getSheets().find(s => s.getSheetId() === LEGACY_SHEET_GID) || ss.getSheets()[0];
+}
+
+function appendToConsentLog(payload, signatureFile, consentId) {
+  try {
+    const sheet = getConsentLogSheet();
+    ensureHeaders(sheet, CONSENT_LOG_HEADERS);
+    const newRow = sheet.getLastRow() + 1;
+    sheet.appendRow([
+      consentId,
+      payload.timestamp || new Date().toISOString(),
+      payload.venue || '',
+      payload.name || '',
+      payload.phone || '',
+      payload.email || '',
+      'Yes',
+      payload.language || 'en',
+      'HAPPY Program',
+      ''
+    ]);
+    if (signatureFile && signatureFile.url) {
+      sheet.getRange(newRow, CONSENT_LOG_HEADERS.length)
+        .setFormula('=HYPERLINK("' + signatureFile.url.replace(/"/g, '') + '","View")');
+    }
+  } catch (err) {
+    appendAuditSafe({ action: 'appendToConsentLogFailed', section: 'consent', notes: err.message });
+  }
+}
+
+function appendToRegistrationSheet(payload, signatureFile, consentId) {
+  try {
+    const ss = SpreadsheetApp.openById(REGISTRATION_SPREADSHEET_ID);
+    const sheet = ss.getSheets().find(s => s.getSheetId() === REGISTRATION_SHEET_GID) || ss.getSheets()[0];
+    ensureHeaders(sheet, CONSENT_LOG_HEADERS);
+    const newRow = sheet.getLastRow() + 1;
+    sheet.appendRow([
+      consentId,
+      payload.timestamp || new Date().toISOString(),
+      payload.venue || '',
+      payload.name || '',
+      payload.phone || '',
+      payload.email || '',
+      'Yes',
+      payload.language || 'en',
+      'HAPPY Program',
+      ''
+    ]);
+    if (signatureFile && signatureFile.url) {
+      sheet.getRange(newRow, CONSENT_LOG_HEADERS.length)
+        .setFormula('=HYPERLINK("' + signatureFile.url.replace(/"/g, '') + '","View")');
+    }
+  } catch (err) {
+    appendAuditSafe({ action: 'appendToRegistrationSheetFailed', section: 'consent', notes: err.message });
+  }
+}
+
+function appendAuditSafe(entry) {
+  try { appendAudit(entry); } catch (_) {}
+}
+
 function getMasterSheet() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheets().find(item => item.getSheetId() === LEGACY_SHEET_GID)
-    || ss.getSheetByName(MASTER_SHEET_NAME)
-    || ss.insertSheet(MASTER_SHEET_NAME);
+  const sheet = ss.getSheetByName(MASTER_SHEET_NAME) || ss.insertSheet(MASTER_SHEET_NAME);
   ensureHeaders(sheet, MASTER_HEADERS);
   return sheet;
 }
