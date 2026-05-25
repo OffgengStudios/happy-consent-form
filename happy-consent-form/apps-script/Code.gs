@@ -9,8 +9,7 @@ const CONSENT_SIGNATURE_FOLDER_ID = '1uczj5UbNUqY0-j6Rn7bosXO13LvvACmV';
 const CV_UPLOAD_FOLDER_ID = '1WEqqBy9AvnzMAkd6dJBXeaO_IqnO1bSc';
 const REGISTRATION_SPREADSHEET_ID = '15wqqAiJIbw6lfzwZFG_fGiklG-jFMCCpQhkaWVtPSzA';
 const REGISTRATION_SHEET_GID = 120260501;
-const REGISTRATION_SHEET_EXPORT_HEADERS = ['participantId', 'participantInfoStatus', 'lastUpdatedAt'].concat(REGISTRATION_HEADERS);
-const BACKEND_VERSION = '2026-05-21-consent-signature-folder';
+const BACKEND_VERSION = '2026-05-25-seamless-kollect-flow';
 
 const LIFECYCLE_HEADERS = [
   'participantId', 'legacyParticipantId', 'continuationTokenHash',
