@@ -136,11 +136,11 @@ async function lookupAndContinue() {
 
   try {
     const result = await apiAction('getParticipantById', { participantId: pid });
-    if (!result || !result.participantId) throw new Error('Participant not found.');
+    if (!result || !result.participant?.participantId) throw new Error('Participant not found.');
     document.getElementById('capacityEntryScreen').classList.add('hidden');
     formState.accessMode = 'capacity-existing';
     initializeForm();
-    prefillParticipantInfo(result);
+    prefillParticipantInfo(result.participant);
     lockSectionB();
     showSections({ A: true, B: true, C: true, D: false });
     document.getElementById('view-form').classList.remove('hidden');
@@ -153,10 +153,11 @@ async function lookupAndContinue() {
 async function unlockWithToken(token) {
   try {
     const result = await apiAction('getParticipantByToken', { token });
-    if (!result || !result.participantId) throw new Error('Invalid or expired link.');
+    if (!result || !result.participant?.participantId) throw new Error('Invalid or expired link.');
     formState.accessMode = 'token';
+    formState.token = token;
     initializeForm();
-    prefillParticipantInfo(result);
+    prefillParticipantInfo(result.participant);
     showSections({ A: true, B: true, C: false, D: false });
     document.getElementById('view-form').classList.remove('hidden');
   } catch (err) {
@@ -770,7 +771,8 @@ function collectFormData() {
     currentJobRoleAlt: document.getElementById('currentJobRoleAlt').value,
     currentIncomeAlt: document.getElementById('currentIncomeAlt').value,
     source: 'kollect',
-    accessMode: formState.accessMode || ''
+    accessMode: formState.accessMode || '',
+    token: formState.token || ''
   };
 }
 

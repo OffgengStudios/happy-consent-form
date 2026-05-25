@@ -322,11 +322,19 @@ function getParticipantById(participantId) {
 }
 
 function saveParticipantInfo(payload, explicitSection) {
-  if (explicitSection === 'capacity' || explicitSection === 'placement') {
+  const accessMode = payload.accessMode || '';
+  const isKollectCapacity = payload.source === 'kollect' &&
+    (accessMode === 'capacity-new' || accessMode === 'capacity-existing');
+
+  if (!isKollectCapacity && (explicitSection === 'capacity' || explicitSection === 'placement')) {
     const adminPassword = getAdminPassword();
     if (!adminPassword || payload.adminPassword !== adminPassword) {
       throw new Error('Admin access is required for capacity building and job placement updates.');
     }
+  }
+
+  if (isKollectCapacity) {
+    explicitSection = accessMode === 'capacity-existing' ? 'capacity' : null;
   }
 
   const sheet = getMasterSheet();
@@ -350,7 +358,7 @@ function saveParticipantInfo(payload, explicitSection) {
   const existing = isNew ? {} : rowToObject(headers, sheet.getRange(rowIndex, 1, 1, headers.length).getValues()[0]);
   const participantId = existing.participantId || payload.participantId || generateParticipantId(sheet, headers);
   const incoming = pickKnownHeaders(payload, headers);
-  enforceSectionScope(incoming, explicitSection, existing);
+  enforceSectionScope(incoming, explicitSection, existing, accessMode);
   normalizeParticipantInfoDefaults(incoming, explicitSection);
   const blockedSections = enforceParticipantLocks(existing, incoming);
   const capacityStatus = resolveCapacityStatus(existing, incoming, explicitSection);
@@ -384,7 +392,7 @@ function saveParticipantInfo(payload, explicitSection) {
     updateRow(sheet, headers, rowIndex, record);
   }
 
-  if (payload.source === 'kollect') appendRegistrationData(record, explicitSection);
+  if (payload.source === 'kollect') appendRegistrationData(record, isKollectCapacity ? accessMode : explicitSection);
 
   appendAudit({
     participantId,
@@ -409,7 +417,11 @@ function saveParticipantInfo(payload, explicitSection) {
   };
 }
 
-function enforceSectionScope(incoming, explicitSection, existing) {
+function enforceSectionScope(incoming, explicitSection, existing, accessMode) {
+  if (accessMode === 'capacity-new') {
+    removeIncomingFields(incoming, JOB_PLACEMENT_FIELDS);
+    return;
+  }
   if (explicitSection === 'capacity') {
     preserveParticipantSectionFields(incoming, CAPACITY_BUILDING_FIELDS, existing);
     removeIncomingFields(incoming, JOB_PLACEMENT_FIELDS);
@@ -830,9 +842,18 @@ function appendToConsentLog(payload, signatureFile, consentId) {
 function appendRegistrationData(record, section) {
   try {
     appendSubmissionMetadata(record);
-    if (!section || section === 'participant') appendParticipantInfo(record);
-    if (section === 'capacity') appendCapacityBuilding(record);
-    if (section === 'placement') appendJobPlacement(record);
+    if (section === 'capacity-new') {
+      appendParticipantInfo(record);
+      appendCapacityBuilding(record);
+    } else if (section === 'capacity-existing') {
+      appendCapacityBuilding(record);
+    } else if (!section || section === 'participant') {
+      appendParticipantInfo(record);
+    } else if (section === 'capacity') {
+      appendCapacityBuilding(record);
+    } else if (section === 'placement') {
+      appendJobPlacement(record);
+    }
   } catch (err) {
     appendAuditSafe({ action: 'appendRegistrationDataFailed', section: 'registration', notes: err.message });
   }
