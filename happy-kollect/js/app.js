@@ -1,6 +1,6 @@
 // ===== CONFIGURATION =====
 const CONFIG = {
-  API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwKhusNAyXQGnpc8tlfGRBmhsdmpOIvz_y30MXG3X6ceXbfq9yM7TsPwakQc-JrFj0iuQ/exec',
+  API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwAnymRCItipYfY66c96mrSRdJE_r2x84J7caU3LmdxRcUgUgmQTOOAe7jdbxm1UgJB/exec',
   QUEUE_KEY: 'happy_kollect_pending',
   LOCAL_DB_KEY: 'happy_kollect_db',
   DEVICE_ID_KEY: 'happyKollectDeviceId',
