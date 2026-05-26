@@ -867,6 +867,18 @@ function collectFormData() {
 function handleSubmitAnother() {
   if (formState.accessMode === 'token') {
     window.location.href = CONFIG.CONSENT_FORM_URL;
+  } else if (formState.accessMode === 'capacity-new' || formState.accessMode === 'capacity-existing') {
+    document.getElementById('successScreen').classList.remove('show');
+    document.getElementById('mainForm').classList.remove('hidden');
+    ['ccVenue','ccName','ccPhone','ccEmail'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('capacityConsentAgree').checked = false;
+    document.getElementById('capacityConsentError').classList.add('hidden');
+    clearCcSignature();
+    document.getElementById('capacityConsentBtn').disabled = false;
+    document.getElementById('capacityConsentBtn').textContent = 'Agree and Continue';
+    formState.token = null;
+    formState.accessMode = null;
+    showCapacityEntryScreen();
   } else {
     resetForm();
   }
