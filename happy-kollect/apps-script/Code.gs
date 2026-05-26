@@ -154,6 +154,13 @@ function getParticipantByToken(token) {
   if (row < 1) throw new Error('Participant not found for this link.');
   const participant = rowToObject(headers, master.getRange(row, 1, 1, headers.length).getValues()[0]);
   participant.continuationTokenHash = '';
+  // Map consent fields → registration fields for participants not yet registered
+  if (!participant.telephone) participant.telephone = participant.consentPhone || '';
+  if (!participant.surname && !participant.firstName && participant.consentName) {
+    const parts = participant.consentName.trim().split(/\s+/);
+    participant.surname   = parts[0] || '';
+    participant.firstName = parts.slice(1).join(' ') || '';
+  }
   return { status: 'OK', participant };
 }
 
