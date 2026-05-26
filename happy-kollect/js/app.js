@@ -1,6 +1,8 @@
 // ===== CONFIGURATION =====
 const CONFIG = {
   API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwAnymRCItipYfY66c96mrSRdJE_r2x84J7caU3LmdxRcUgUgmQTOOAe7jdbxm1UgJB/exec',
+  CONSENT_FORM_URL: 'https://murphy-richard.github.io/happy-consent-form/',
+  CONSENT_API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwOJGkeb5cUERtNF0UVAoljCzZE6wnTSrk4lpzQtDzYXgpyhiZWhdUXph7OdrbAbf9l/exec',
   QUEUE_KEY: 'happy_kollect_pending',
   LOCAL_DB_KEY: 'happy_kollect_db',
   DEVICE_ID_KEY: 'happyKollectDeviceId',
@@ -109,9 +111,94 @@ function showLockedScreen() {
 }
 
 function showCapacityEntryScreen() {
-  document.getElementById('capacityEntryScreen').classList.remove('hidden');
+  document.getElementById('capacityConsentScreen').classList.remove('hidden');
+  document.getElementById('capacityEntryScreen').classList.add('hidden');
   document.getElementById('lockedScreen').classList.add('hidden');
   document.getElementById('view-form').classList.add('hidden');
+  initCcSignature();
+}
+let ccSigCanvas, ccSigCtx, ccSigDrawing = false;
+
+function initCcSignature() {
+  ccSigCanvas = document.getElementById('ccSigCanvas');
+  if (!ccSigCanvas) return;
+  ccSigCanvas.width  = ccSigCanvas.offsetWidth  || 400;
+  ccSigCanvas.height = ccSigCanvas.offsetHeight || 120;
+  ccSigCtx = ccSigCanvas.getContext('2d');
+  ccSigCtx.strokeStyle = '#1e293b';
+  ccSigCtx.lineWidth   = 2;
+  ccSigCtx.lineCap     = 'round';
+  ccSigDrawing = false;
+
+  function pos(e) {
+    const r = ccSigCanvas.getBoundingClientRect();
+    const s = e.touches ? e.touches[0] : e;
+    return { x: (s.clientX - r.left) * (ccSigCanvas.width / r.width), y: (s.clientY - r.top) * (ccSigCanvas.height / r.height) };
+  }
+  ccSigCanvas.addEventListener('mousedown',  e => { ccSigDrawing = true; ccSigCtx.beginPath(); const p = pos(e); ccSigCtx.moveTo(p.x, p.y); });
+  ccSigCanvas.addEventListener('mousemove',  e => { if (!ccSigDrawing) return; const p = pos(e); ccSigCtx.lineTo(p.x, p.y); ccSigCtx.stroke(); });
+  ccSigCanvas.addEventListener('mouseup',    () => ccSigDrawing = false);
+  ccSigCanvas.addEventListener('touchstart', e => { e.preventDefault(); ccSigDrawing = true; ccSigCtx.beginPath(); const p = pos(e); ccSigCtx.moveTo(p.x, p.y); }, { passive: false });
+  ccSigCanvas.addEventListener('touchmove',  e => { e.preventDefault(); if (!ccSigDrawing) return; const p = pos(e); ccSigCtx.lineTo(p.x, p.y); ccSigCtx.stroke(); }, { passive: false });
+  ccSigCanvas.addEventListener('touchend',   () => ccSigDrawing = false);
+}
+
+function clearCcSignature() {
+  if (ccSigCtx) ccSigCtx.clearRect(0, 0, ccSigCanvas.width, ccSigCanvas.height);
+}
+
+function isCcSigEmpty() {
+  if (!ccSigCanvas) return true;
+  const d = ccSigCtx.getImageData(0, 0, ccSigCanvas.width, ccSigCanvas.height).data;
+  for (let i = 3; i < d.length; i += 4) { if (d[i] > 0) return false; }
+  return true;
+}
+
+async function submitCapacityConsent() {
+  const errEl  = document.getElementById('capacityConsentError');
+  const venue  = document.getElementById('ccVenue').value.trim();
+  const name   = document.getElementById('ccName').value.trim();
+  const phone  = document.getElementById('ccPhone').value.trim();
+  const email  = document.getElementById('ccEmail').value.trim();
+  const agreed = document.getElementById('capacityConsentAgree').checked;
+
+  if (!venue || !name || !phone) { errEl.textContent = 'Please fill in Venue, Name and Phone.'; errEl.classList.remove('hidden'); return; }
+  if (!agreed)                   { errEl.textContent = 'Please agree to the consent terms to continue.'; errEl.classList.remove('hidden'); return; }
+  if (isCcSigEmpty())            { errEl.textContent = 'Please provide the participant signature.'; errEl.classList.remove('hidden'); return; }
+  errEl.classList.add('hidden');
+
+  const btn = document.getElementById('capacityConsentBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting consent...';
+
+  try {
+    const signatureDataUrl = ccSigCanvas.toDataURL('image/png');
+    const response = await fetch(CONFIG.CONSENT_API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'initConsent', name, phone, email, venue, signature: signatureDataUrl, language: 'en', timestamp: new Date().toISOString() })
+    });
+    const result = await response.json();
+    if (result.status !== 'OK') throw new Error(result.message || 'Consent submission failed.');
+
+    // Consent recorded — now unlock capacity building with the returned token
+    const token = result.token;
+    formState.token = token;
+    formState.accessMode = 'capacity-new';
+    document.getElementById('capacityConsentScreen').classList.add('hidden');
+    initializeForm();
+    document.getElementById('surname').value   = name.trim().split(/\s+/)[0] || '';
+    document.getElementById('firstName').value = name.trim().split(/\s+/).slice(1).join(' ') || '';
+    document.getElementById('telephone').value = phone;
+    showSections({ A: true, B: true, C: true, D: false });
+    document.getElementById('view-form').classList.remove('hidden');
+    showToast('Consent recorded. Email sent to participant.', 'success');
+  } catch (err) {
+    errEl.textContent = 'Error: ' + err.message;
+    errEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'Agree and Continue';
+  }
 }
 
 function selectCapacityMode(mode) {
