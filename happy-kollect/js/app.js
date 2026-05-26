@@ -502,7 +502,7 @@ function updateIds() {
   const seq = getNextLocalSequence();
   document.getElementById('submissionId').value = `${rPrefix}-${String(seq).padStart(6,'0')}-${ts}`;
   document.getElementById('subIdDisplay').textContent = `${rPrefix}-${String(seq).padStart(6,'0')}-${ts}`;
-  document.getElementById('hamisId').value = `HAMIS-${rPrefix}-${String(seq).padStart(6,'0')}`;
+  document.getElementById('hamisId').value = `HAMIS-${pPrefix}-${rPrefix}-${String(seq).padStart(6,'0')}`;
   document.getElementById('participantId').placeholder = `${pPrefix}--${String(seq).padStart(7,'0')} (will auto-generate)`;
 }
 function generateDeviceId() {
