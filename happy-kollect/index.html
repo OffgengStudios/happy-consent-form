@@ -452,10 +452,6 @@
               <input type="date" id="trainingEndDate" class="field-input">
             </div>
             <div class="field-group">
-              <label class="field-label required">Training Location</label>
-              <input type="text" id="trainingLocation" class="field-input" placeholder="Venue/Location">
-            </div>
-            <div class="field-group">
               <label class="field-label required">Mode of Training</label>
               <select id="trainingMode" class="field-input" required onchange="toggleTrainingModeFields()">
                 <option value="">Select</option>
@@ -463,6 +459,10 @@
                 <option value="Virtual">Virtual</option>
                 <option value="Hybrid">Hybrid</option>
               </select>
+            </div>
+            <div class="field-group hidden" id="trainingLocationGroup">
+              <label class="field-label required">Training Location</label>
+              <input type="text" id="trainingLocation" class="field-input" placeholder="Venue/Location">
             </div>
           </div>
           <div id="virtualTrainingFields" class="field-group hidden" style="background:#f0f9ff;padding:0.75rem;border-radius:0.5rem;margin:0.5rem 0;border-left:3px solid #7c3aed">

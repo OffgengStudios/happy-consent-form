@@ -515,7 +515,8 @@ function toggleCapacityFields(show) {
 }
 function toggleTrainingModeFields() {
   const mode = document.getElementById('trainingMode').value;
-  document.getElementById('virtualTrainingFields').classList.toggle('hidden', mode !== 'Virtual');
+  document.getElementById('virtualTrainingFields').classList.toggle('hidden', mode !== 'Virtual' && mode !== 'Hybrid');
+  document.getElementById('trainingLocationGroup').classList.toggle('hidden', mode === 'Virtual' || mode === '');
 }
 function togglePlacementFields(show) {
   document.getElementById('placementFields').classList.toggle('show', show);
