@@ -46,7 +46,8 @@ const MASTER_HEADERS = [
   'employerName', 'contractType', 'workHours',
   'currentlyEmployed', 'currentEmployer', 'currentJobRoleAlt', 'currentIncomeAlt',
   'hasCv', 'cvUploadName', 'cvUploadType', 'cvUploadSize',
-  'participantPhoneNormalized', 'participantEmailNormalized', 'ghanaCardNormalized', 'adminNotes'
+  'participantPhoneNormalized', 'participantEmailNormalized', 'ghanaCardNormalized', 'adminNotes',
+  'legacyParticipantId'
 ];
 
 const AUDIT_HEADERS = [

@@ -69,13 +69,13 @@ function initConsent(payload) {
   let participantId;
   let rowIndex;
 
-  const signatureFile = saveConsentSignatureToDrive(payload, 'tmp');
+  let signatureFileUrl = '';
 
   if (existingRow > 0) {
     const existing = rowToObject(headers, master.getRange(existingRow, 1, 1, headers.length).getValues()[0]);
     participantId = existing.participantId;
-    // Re-save signature with correct participant ID
     const sig = saveConsentSignatureToDrive(payload, participantId);
+    signatureFileUrl = sig.url;
     updateRow(master, headers, existingRow, {
       continuationTokenHash:     tokenHash,
       continuationTokenCreatedAt: now,
@@ -99,6 +99,7 @@ function initConsent(payload) {
   } else {
     participantId = generateParticipantId(master, headers);
     const sig = saveConsentSignatureToDrive(payload, participantId);
+    signatureFileUrl = sig.url;
     const record = blankRecord(headers);
     Object.assign(record, {
       participantId,
@@ -129,17 +130,10 @@ function initConsent(payload) {
     });
     master.appendRow(headers.map(h => toSheetValue(record[h] || '')));
     rowIndex = master.getLastRow();
-    // Re-fetch signature with real participant ID
-    const sigFinal = saveConsentSignatureToDrive(payload, participantId);
-    updateRow(master, headers, rowIndex, {
-      consentSignatureFileUrl:  sigFinal.url,
-      consentSignatureFileId:   sigFinal.id,
-      consentSignatureFileName: sigFinal.name
-    });
   }
 
   // Write to consent log (consent spreadsheet)
-  appendToConsentLog(payload, consentId, participantId);
+  appendToConsentLog(payload, consentId, participantId, signatureFileUrl);
 
   // Audit
   appendAudit({
@@ -193,7 +187,7 @@ function getConsentLogSheet() {
   return ss.getSheetByName(CONSENT_TAB_NAME) || ss.getSheets()[0];
 }
 
-function appendToConsentLog(payload, consentId, participantId) {
+function appendToConsentLog(payload, consentId, participantId, signatureFileUrl) {
   try {
     const sheet = getConsentLogSheet();
     ensureHeaders(sheet, CONSENT_LOG_HEADERS);
@@ -210,6 +204,9 @@ function appendToConsentLog(payload, consentId, participantId) {
       'HAPPY Program',
       ''
     ]);
+    if (signatureFileUrl) {
+      sheet.getRange(row, 10).setFormula('=HYPERLINK("' + signatureFileUrl + '","View")');
+    }
   } catch (err) {
     // Non-fatal — audit will still record the consent
   }
