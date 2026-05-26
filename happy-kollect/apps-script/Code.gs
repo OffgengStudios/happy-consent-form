@@ -215,7 +215,7 @@ function saveParticipantInfo(payload, explicitSection) {
   scopeToSection(incoming, explicitSection, accessMode, existing);
 
   const capacityStatus  = resolveCapacityStatus(existing, incoming, explicitSection, accessMode);
-  const placementStatus = resolvePlacementStatus(existing, incoming, explicitSection);
+  const placementStatus = resolvePlacementStatus(existing, incoming, explicitSection, accessMode);
   const lockedSections  = buildLockedSections(capacityStatus, placementStatus);
 
   const record = Object.assign(blankRecord(headers), existing, incoming, {
@@ -267,6 +267,10 @@ function saveParticipantInfo(payload, explicitSection) {
 
 // ─── SECTION SCOPING ─────────────────────────────────────────────────────────
 function scopeToSection(incoming, explicitSection, accessMode, existing) {
+  if (accessMode === 'admin') {
+    // Admin submits all visible sections in one pass — no stripping
+    return;
+  }
   if (accessMode === 'capacity-new') {
     // New participant via capacity mode: Participant Info + Capacity Building, no Job Placement
     PLACEMENT_FIELDS.forEach(f => delete incoming[f]);
@@ -302,7 +306,11 @@ function scopeToSection(incoming, explicitSection, accessMode, existing) {
 function appendRegistrationData(record, explicitSection, accessMode) {
   try {
     appendSubmissionMetadata(record);
-    if (accessMode === 'capacity-new') {
+    if (accessMode === 'admin') {
+      appendParticipantInfo(record);
+      if (record.trainedByPartner === 'Yes') appendCapacityBuilding(record);
+      if (record.placedByPartner   === 'Yes') appendJobPlacement(record);
+    } else if (accessMode === 'capacity-new') {
       appendParticipantInfo(record);
       appendCapacityBuilding(record);
     } else if (accessMode === 'capacity-existing' || explicitSection === 'capacity') {
@@ -765,12 +773,14 @@ function fromSheetValue(v) {
 function resolveCapacityStatus(existing, incoming, explicitSection, accessMode) {
   if (existing.capacityBuildingStatus === 'submitted') return 'submitted';
   if (explicitSection === 'capacity' || accessMode === 'capacity-existing' || accessMode === 'capacity-new') return 'submitted';
+  if (accessMode === 'admin' && incoming.trainedByPartner === 'Yes') return 'submitted';
   return existing.capacityBuildingStatus || 'not_started';
 }
 
-function resolvePlacementStatus(existing, incoming, explicitSection) {
+function resolvePlacementStatus(existing, incoming, explicitSection, accessMode) {
   if (existing.jobPlacementStatus === 'submitted') return 'submitted';
   if (explicitSection === 'placement') return 'submitted';
+  if (accessMode === 'admin' && incoming.placedByPartner === 'Yes') return 'submitted';
   return existing.jobPlacementStatus || 'not_started';
 }
 

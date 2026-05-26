@@ -525,6 +525,9 @@ function togglePlacementFields(show) {
   document.getElementById('placementFields').classList.toggle('show', show);
   setSectionControlsDisabled('placementFields', !show);
   document.getElementById('currentEmploymentFields').classList.toggle('show', !show);
+  if (show && !document.getElementById('placementRegion').value) {
+    document.getElementById('placementDistrict').disabled = true;
+  }
 }
 function togglePreviousTrainingDetails() {
   const show = document.getElementById('previousTrainings').value === 'Yes';
