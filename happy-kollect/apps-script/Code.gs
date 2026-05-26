@@ -68,11 +68,11 @@ const PARTICIPANT_INFO_HEADERS = [
   'ORIGINAL COMMUNITY', 'HOST COMMUNITY', 'DISABILITY STATUS', 'DISABILITY SPECIFY',
   'EDUCATION LEVEL', 'EMPLOYMENT STATUS', 'CURRENT OCCUPATION',
   'MONTHLY INCOME', 'INCOME FREQUENCY', 'SECTOR', 'INDUSTRY', 'JOB TYPE', 'JOB ROLE',
-  'WORK REGION', 'WORK DISTRICT'
+  'WORK REGION', 'WORK DISTRICT', 'WORK COMMUNITY'
 ];
 
 const CAPACITY_BUILDING_HEADERS = [
-  'PARTICIPANT ID', 'SUBMISSION ID',
+  'PARTICIPANT ID', 'SUBMISSION ID', 'TRAINED BY PARTNER',
   'TRAINING START DATE', 'TRAINING END DATE', 'TRAINING LOCATION', 'TRAINING MODE',
   'VIRTUAL PLATFORM', 'TRAINER TYPE', 'TRAINING PARTNER', 'COMPLETION STATUS',
   'CERTIFICATE ISSUED', 'MODULES', 'DIGITAL SKILLS', 'WISH TRAINING',
@@ -182,8 +182,8 @@ function saveParticipantInfo(payload, explicitSection) {
   // Capacity building via ?mode=capacity does NOT require admin password
   const isCapacityMode = (accessMode === 'capacity-new' || accessMode === 'capacity-existing');
 
-  // Job placement and explicit capacity (admin-only) require password
-  if (!isCapacityMode && (explicitSection === 'capacity' || explicitSection === 'placement')) {
+  // Admin mode and explicit capacity/placement submissions require password
+  if (accessMode === 'admin' || (!isCapacityMode && (explicitSection === 'capacity' || explicitSection === 'placement'))) {
     const pwd = getAdminPassword();
     if (!pwd || payload.adminPassword !== pwd) {
       throw new Error('Admin password required for this action.');
@@ -375,7 +375,8 @@ function appendParticipantInfo(record) {
     record.jobType            || '',
     record.jobRole            || '',
     record.workRegion         || '',
-    record.workDistrict       || ''
+    record.workDistrict       || '',
+    record.workCommunity      || ''
   ]);
 }
 
@@ -384,6 +385,7 @@ function appendCapacityBuilding(record) {
   sheet.appendRow([
     record.participantId       || '',
     record.submissionId        || '',
+    record.trainedByPartner    || '',
     record.trainingStartDate   || '',
     record.trainingEndDate     || '',
     record.trainingLocation    || '',

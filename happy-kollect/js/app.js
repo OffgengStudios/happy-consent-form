@@ -195,7 +195,7 @@ async function submitCapacityConsent() {
     document.getElementById('telephone').value = phone;
     showSections({ A: true, B: true, C: true, D: false });
     document.getElementById('view-form').classList.remove('hidden');
-    showToast('Consent recorded. Email sent to participant.', 'success');
+    showToast(result.emailSent ? 'Consent recorded. Email sent to participant.' : 'Consent recorded.', 'success');
   } catch (err) {
     errEl.textContent = 'Error: ' + err.message;
     errEl.classList.remove('hidden');
@@ -866,7 +866,8 @@ function collectFormData() {
     currentIncomeAlt: document.getElementById('currentIncomeAlt').value,
     source: 'kollect',
     accessMode: formState.accessMode || '',
-    token: formState.token || ''
+    token: formState.token || '',
+    adminPassword: formState.adminPassword || ''
   };
 }
 
