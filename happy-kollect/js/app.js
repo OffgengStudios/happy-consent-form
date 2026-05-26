@@ -56,8 +56,10 @@ let formState = {
   isAdmin: false,
   adminPassword: '',
   masterSheetData: [],
+  reportFilteredData: null,
   currentView: 'form',
   isSheetLoading: false,
+  pendingAdminView: null,
   accessMode: null // 'token' | 'capacity-existing' | 'capacity-new' | 'admin'
 };
 
@@ -313,19 +315,27 @@ function setupEventListeners() {
 // ===== VIEW SWITCHING =====
 function setView(view) {
   formState.currentView = view;
-  document.getElementById('view-form').classList.toggle('hidden', view !== 'form');
-  document.getElementById('view-sheet').classList.toggle('hidden', view !== 'sheet');
-  document.getElementById('tab-form').classList.toggle('active', view === 'form');
-  document.getElementById('tab-sheet').classList.toggle('active', view === 'sheet');
+  ['form', 'sheet', 'dashboard', 'report'].forEach(v => {
+    document.getElementById('view-' + v).classList.toggle('hidden', view !== v);
+    const tab = document.getElementById('tab-' + v);
+    if (tab) tab.classList.toggle('active', view === v);
+  });
 }
 
 // ===== ADMIN LOGIN =====
 function showAdminLogin() {
+  openAdminView('sheet');
+}
+
+function openAdminView(targetView) {
   if (formState.isAdmin) {
-    setView('sheet');
-    loadSheetData();
+    setView(targetView);
+    if (targetView === 'dashboard') loadDashboard();
+    else if (targetView === 'report') loadReport();
+    else if (targetView === 'sheet') loadSheetData();
     return;
   }
+  formState.pendingAdminView = targetView;
   document.getElementById('adminModal').classList.remove('hidden');
   document.getElementById('adminPassword').value = '';
   document.getElementById('adminPassword').focus();
@@ -344,14 +354,17 @@ async function verifyAdmin() {
     formState.masterSheetData = data;
     closeAdminLogin();
     showToast('Admin access granted', 'success');
-    if (document.getElementById('view-form').classList.contains('hidden')) {
+    // Always initialize admin entry form if coming from locked screen
+    if (!document.getElementById('lockedScreen').classList.contains('hidden')) {
       initializeForm();
       showSections({ A: true, B: true, C: true, D: true });
       document.getElementById('lockedScreen').classList.add('hidden');
-      document.getElementById('view-form').classList.remove('hidden');
     }
-    renderSheet(data);
-    setView('sheet');
+    const targetView = formState.pendingAdminView || 'sheet';
+    formState.pendingAdminView = null;
+    if (targetView === 'dashboard') { setView('dashboard'); renderDashboard(data); }
+    else if (targetView === 'report') { setView('report'); renderReport(data); }
+    else { renderSheet(data); setView('sheet'); }
   } catch (err) {
     showToast(`Access denied: ${err.message}`, 'error');
   }
@@ -993,6 +1006,281 @@ function renderSheet(data) {
     columns.forEach(col => { const td = document.createElement('td'); td.textContent = formatCell(row[col]); tr.appendChild(td); });
     body.appendChild(tr);
   });
+}
+
+// ===== ADMIN DATA REFRESH =====
+async function refreshAdminData(view) {
+  if (!formState.isAdmin) return;
+  try {
+    showToast('Refreshing data...', 'info');
+    const data = await fetchProtectedSheetData(formState.adminPassword);
+    formState.masterSheetData = data;
+    if (view === 'sheet') renderSheet(data);
+    else if (view === 'dashboard') renderDashboard(data);
+    else if (view === 'report') renderReport(data);
+    showToast('Data refreshed.', 'success');
+  } catch (err) {
+    showToast('Refresh failed: ' + err.message, 'error');
+  }
+}
+
+// ===== DASHBOARD =====
+function loadDashboard() {
+  const data = formState.masterSheetData;
+  if (!data || !data.length) {
+    document.getElementById('dashboardContent').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:2.5rem 1rem;font-size:0.85rem;">No data loaded — click Refresh to fetch from Google Sheets.</p>';
+    return;
+  }
+  renderDashboard(data);
+}
+
+function renderDashboard(data) {
+  document.getElementById('dashboardTimestamp').textContent = 'Data as of ' + new Date().toLocaleString();
+  const total = data.length;
+  if (!total) {
+    document.getElementById('dashboardContent').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:2rem;">No participants found.</p>';
+    return;
+  }
+
+  const female    = data.filter(r => r.sex === 'Female').length;
+  const male      = data.filter(r => r.sex === 'Male').length;
+  const youth     = data.filter(r => { const a = Number(r.age); return !isNaN(a) && a >= 15 && a <= 35; }).length;
+  const pwd       = data.filter(r => r.disabilityStatus === 'Yes').length;
+  const refugee   = data.filter(r => r.refugeeStatus === 'Yes').length;
+  const displaced = data.filter(r => r.displacementStatus === 'Yes').length;
+  const trained   = data.filter(r => r.capacityBuildingStatus === 'submitted').length;
+  const placed    = data.filter(r => r.jobPlacementStatus === 'submitted').length;
+
+  const byPartner    = groupCount(data, 'implementingPartner');
+  const byRegion     = groupCount(data, 'region');
+  const byEmployment = groupCount(data, 'employmentStatus');
+  const byEducation  = groupCount(data, 'educationLevel');
+
+  document.getElementById('dashboardContent').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:0.6rem;margin-bottom:1.5rem;">
+      ${statCard(total,    'Total',       '#5B45E8')}
+      ${statCard(female,   'Female',      '#ec4899', pct(female, total))}
+      ${statCard(male,     'Male',        '#3b82f6', pct(male, total))}
+      ${statCard(youth,    'Youth 15–35', '#8b5cf6', pct(youth, total))}
+      ${statCard(pwd,      'PWD',         '#f59e0b', pct(pwd, total))}
+      ${statCard(refugee,  'Refugee',     '#ef4444', pct(refugee, total))}
+      ${statCard(displaced,'Displaced',   '#f97316', pct(displaced, total))}
+      ${statCard(trained,  'Trained',     '#10b981', pct(trained, total))}
+      ${statCard(placed,   'Placed',      '#06b6d4', pct(placed, total))}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+      <div>
+        <p style="font-size:0.62rem;font-weight:900;text-transform:uppercase;color:#94a3b8;letter-spacing:0.07em;margin-bottom:0.5rem;">By Implementing Partner</p>
+        ${barChart(byPartner, '#5B45E8')}
+      </div>
+      <div>
+        <p style="font-size:0.62rem;font-weight:900;text-transform:uppercase;color:#94a3b8;letter-spacing:0.07em;margin-bottom:0.5rem;">By Region</p>
+        ${barChart(byRegion, '#3b82f6')}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
+      <div>
+        <p style="font-size:0.62rem;font-weight:900;text-transform:uppercase;color:#94a3b8;letter-spacing:0.07em;margin-bottom:0.5rem;">Employment Status</p>
+        ${barChart(byEmployment, '#10b981')}
+      </div>
+      <div>
+        <p style="font-size:0.62rem;font-weight:900;text-transform:uppercase;color:#94a3b8;letter-spacing:0.07em;margin-bottom:0.5rem;">Education Level</p>
+        ${barChart(byEducation, '#f59e0b')}
+      </div>
+    </div>`;
+}
+
+function statCard(value, label, color, subtitle) {
+  return `<div style="background:#fafafa;border-radius:0.75rem;padding:0.75rem 0.5rem;border-left:3px solid ${color};text-align:center;">
+    <div style="font-size:1.5rem;font-weight:900;color:${color};line-height:1.1;">${value}</div>
+    ${subtitle ? `<div style="font-size:0.58rem;color:${color};font-weight:700;margin-bottom:0.1rem;">${subtitle}</div>` : ''}
+    <div style="font-size:0.58rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin-top:0.15rem;">${label}</div>
+  </div>`;
+}
+
+function pct(n, d) { return d ? Math.round(n / d * 100) + '%' : '0%'; }
+
+function groupCount(data, field) {
+  const counts = {};
+  data.forEach(r => { const v = r[field] || '(blank)'; counts[v] = (counts[v] || 0) + 1; });
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+}
+
+function barChart(entries, color) {
+  if (!entries.length) return '<p style="font-size:0.7rem;color:#94a3b8;">No data</p>';
+  const max = entries[0][1];
+  return entries.slice(0, 8).map(([label, count]) => {
+    const w = max ? Math.round(count / max * 100) : 0;
+    return `<div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.3rem;">
+      <span style="min-width:72px;max-width:72px;font-size:0.63rem;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+      <div style="flex:1;background:#f1f5f9;border-radius:999px;height:6px;">
+        <div style="background:${color};height:6px;border-radius:999px;width:${w}%;"></div>
+      </div>
+      <span style="font-size:0.6rem;color:#64748b;min-width:22px;text-align:right;">${count}</span>
+    </div>`;
+  }).join('');
+}
+
+// ===== REPORT =====
+function loadReport() {
+  const data = formState.masterSheetData;
+  if (!data || !data.length) {
+    document.getElementById('reportContent').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:2.5rem 1rem;font-size:0.85rem;">No data loaded — click Refresh to fetch from Google Sheets.</p>';
+    return;
+  }
+  renderReport(data);
+}
+
+function renderReport(data) {
+  document.getElementById('reportTimestamp').textContent = 'Data as of ' + new Date().toLocaleString();
+  const partners = [...new Set(data.map(r => r.implementingPartner).filter(Boolean))].sort();
+  const regions  = [...new Set(data.map(r => r.region).filter(Boolean))].sort();
+  const partnerSel = document.getElementById('filterPartner');
+  const regionSel  = document.getElementById('filterRegion');
+  const curPartner = partnerSel.value, curRegion = regionSel.value;
+  partnerSel.innerHTML = '<option value="">All Partners</option>' + partners.map(p => `<option value="${escapeHtml(p)}"${p === curPartner ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('');
+  regionSel.innerHTML  = '<option value="">All Regions</option>'  + regions.map(r  => `<option value="${escapeHtml(r)}"${r === curRegion  ? ' selected' : ''}>${escapeHtml(r)}</option>`).join('');
+  document.getElementById('reportFilters').style.display = 'flex';
+  applyReportFilters();
+}
+
+function applyReportFilters() {
+  const data = formState.masterSheetData || [];
+  const pf  = document.getElementById('filterPartner')?.value || '';
+  const rf  = document.getElementById('filterRegion')?.value  || '';
+  const sf  = document.getElementById('filterSex')?.value     || '';
+  const stf = document.getElementById('filterStatus')?.value  || '';
+  const filtered = data.filter(r => {
+    if (pf  && r.implementingPartner !== pf)                          return false;
+    if (rf  && r.region !== rf)                                       return false;
+    if (sf  && r.sex !== sf)                                          return false;
+    if (stf === 'capacity'  && r.capacityBuildingStatus !== 'submitted') return false;
+    if (stf === 'placement' && r.jobPlacementStatus !== 'submitted')     return false;
+    return true;
+  });
+  formState.reportFilteredData = filtered;
+  buildReportTables(filtered);
+}
+
+function buildReportTables(data) {
+  const total = data.length;
+  if (!total) {
+    document.getElementById('reportContent').innerHTML = '<p style="text-align:center;color:#94a3b8;padding:2rem;font-size:0.85rem;">No records match the current filters.</p>';
+    return;
+  }
+  const trained = data.filter(r => r.capacityBuildingStatus === 'submitted');
+  const placed  = data.filter(r => r.jobPlacementStatus === 'submitted');
+
+  const allPartners = [...new Set(data.map(r => r.implementingPartner || '(None)'))].sort();
+  const partnerRows = allPartners.map(p => {
+    const g  = data.filter(r => (r.implementingPartner || '(None)') === p);
+    const tr = g.filter(r => r.capacityBuildingStatus === 'submitted').length;
+    const pl = g.filter(r => r.jobPlacementStatus === 'submitted').length;
+    return [p, g.length,
+      g.filter(r => r.sex === 'Female').length,
+      g.filter(r => { const a = Number(r.age); return !isNaN(a) && a >= 15 && a <= 35; }).length,
+      g.filter(r => r.disabilityStatus === 'Yes').length,
+      tr, pct(tr, g.length), pl, pct(pl, g.length)];
+  });
+
+  const allRegions = [...new Set(data.map(r => r.region || '(None)'))].sort();
+  const regionRows = allRegions.slice(0, 16).map(reg => {
+    const g = data.filter(r => (r.region || '(None)') === reg);
+    const f = g.filter(r => r.sex === 'Female').length;
+    const y = g.filter(r => { const a = Number(r.age); return !isNaN(a) && a >= 15 && a <= 35; }).length;
+    return [reg, g.length, f, pct(f, g.length), y, pct(y, g.length)];
+  });
+
+  const byMode       = groupCount(trained, 'trainingMode');
+  const byCompletion = groupCount(trained, 'completionStatus');
+  const bySector     = groupCount(placed,  'plSector');
+  const byEmpType    = groupCount(placed,  'employmentType');
+
+  document.getElementById('reportContent').innerHTML = `
+    <div style="font-size:0.7rem;color:#64748b;margin-bottom:1rem;padding:0.5rem 0.75rem;background:#f8fafc;border-radius:0.5rem;">
+      <strong>${total}</strong> participant${total !== 1 ? 's' : ''} &bull;
+      Trained: <strong>${trained.length}</strong> (${pct(trained.length, total)}) &bull;
+      Placed: <strong>${placed.length}</strong> (${pct(placed.length, total)})
+    </div>
+
+    <p style="font-size:0.63rem;font-weight:900;text-transform:uppercase;color:#064e3b;letter-spacing:0.07em;margin-bottom:0.5rem;">Partner Summary</p>
+    ${summaryTable(
+      ['Partner','Total','Female','Youth','PWD','Trained','Trained%','Placed','Placed%'],
+      partnerRows
+    )}
+
+    <p style="font-size:0.63rem;font-weight:900;text-transform:uppercase;color:#1e3a5f;letter-spacing:0.07em;margin:1.25rem 0 0.5rem;">Regional Distribution</p>
+    ${summaryTable(['Region','Total','Female','Female%','Youth','Youth%'], regionRows)}
+
+    ${trained.length ? `
+    <p style="font-size:0.63rem;font-weight:900;text-transform:uppercase;color:#4c1d95;letter-spacing:0.07em;margin:1.25rem 0 0.5rem;">Training Outcomes (${trained.length} trained)</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div>
+        <p style="font-size:0.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:0.35rem;">By Mode</p>
+        ${summaryTable(['Mode','Count','%'], byMode.map(([k,v]) => [k, v, pct(v, trained.length)]))}
+      </div>
+      <div>
+        <p style="font-size:0.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:0.35rem;">Completion Status</p>
+        ${summaryTable(['Status','Count','%'], byCompletion.map(([k,v]) => [k, v, pct(v, trained.length)]))}
+      </div>
+    </div>` : ''}
+
+    ${placed.length ? `
+    <p style="font-size:0.63rem;font-weight:900;text-transform:uppercase;color:#064e3b;letter-spacing:0.07em;margin:1.25rem 0 0.5rem;">Placement Outcomes (${placed.length} placed)</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div>
+        <p style="font-size:0.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:0.35rem;">By Sector</p>
+        ${summaryTable(['Sector','Count','%'], bySector.map(([k,v]) => [k, v, pct(v, placed.length)]))}
+      </div>
+      <div>
+        <p style="font-size:0.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:0.35rem;">Employment Type</p>
+        ${summaryTable(['Type','Count','%'], byEmpType.map(([k,v]) => [k, v, pct(v, placed.length)]))}
+      </div>
+    </div>` : ''}`;
+}
+
+function summaryTable(headers, rows) {
+  if (!rows.length) return '<p style="font-size:0.7rem;color:#94a3b8;margin-bottom:0.5rem;">No data</p>';
+  const head = headers.map(h =>
+    `<th style="padding:0.3rem 0.5rem;text-align:left;font-size:0.58rem;font-weight:900;text-transform:uppercase;color:#64748b;background:#f8fafc;border-bottom:2px solid #e2e8f0;white-space:nowrap;">${h}</th>`
+  ).join('');
+  const body = rows.map(row =>
+    '<tr>' + row.map((cell, i) =>
+      `<td style="padding:0.3rem 0.5rem;font-size:0.7rem;color:${i === 0 ? '#374151' : '#1e293b'};font-weight:${i === 0 ? '600' : '400'};border-bottom:1px solid #f1f5f9;">${escapeHtml(String(cell ?? ''))}</td>`
+    ).join('') + '</tr>'
+  ).join('');
+  return `<div style="overflow-x:auto;margin-bottom:0.5rem;"><table style="width:100%;border-collapse:collapse;"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function clearReportFilters() {
+  ['filterPartner','filterRegion','filterSex','filterStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  applyReportFilters();
+}
+
+function exportReportData() {
+  const data = formState.reportFilteredData || formState.masterSheetData || [];
+  if (!data.length) { showToast('No data to export', 'error'); return; }
+  const keys = Array.from(data.reduce((set, row) => { Object.keys(row || {}).forEach(k => set.add(k)); return set; }, new Set()));
+  const csv = [
+    keys.join(','),
+    ...data.map(row => keys.map(k => {
+      const val = String(row[k] ?? '').replace(/"/g, '""');
+      return (val.includes(',') || val.includes('"') || val.includes('\n')) ? `"${val}"` : val;
+    }).join(','))
+  ].join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `happy-report-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Report CSV downloaded.', 'success');
 }
 
 function humanizeHeader(key) {
