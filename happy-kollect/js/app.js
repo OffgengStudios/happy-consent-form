@@ -120,8 +120,11 @@ function showCapacityEntryScreen() {
 let ccSigCanvas, ccSigCtx, ccSigDrawing = false;
 
 function initCcSignature() {
-  ccSigCanvas = document.getElementById('ccSigCanvas');
-  if (!ccSigCanvas) return;
+  const old = document.getElementById('ccSigCanvas');
+  if (!old) return;
+  const fresh = old.cloneNode(false);
+  old.parentNode.replaceChild(fresh, old);
+  ccSigCanvas = fresh;
   ccSigCanvas.width  = ccSigCanvas.offsetWidth  || 400;
   ccSigCanvas.height = ccSigCanvas.offsetHeight || 120;
   ccSigCtx = ccSigCanvas.getContext('2d');
@@ -892,7 +895,7 @@ function resetForm() {
     const el = document.getElementById(id);
     if (el) el.classList.remove('show');
   });
-  ['nationalityField','disabilitySpecField','virtualTrainingFields','previousTrainingDetails',
+  ['nationalityField','disabilitySpecField','virtualTrainingFields','trainingLocationGroup','previousTrainingDetails',
    'currentEmploymentDetails','displacementReasonField','originalCommunityField','hostCommunityField'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
