@@ -776,6 +776,14 @@ function collectFormData() {
   };
 }
 
+function handleSubmitAnother() {
+  if (formState.accessMode === 'token') {
+    window.location.href = CONFIG.CONSENT_FORM_URL;
+  } else {
+    resetForm();
+  }
+}
+
 function resetForm() {
   document.getElementById('mainForm').reset();
   document.getElementById('mainForm').classList.remove('hidden');
